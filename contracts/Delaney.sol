@@ -176,8 +176,7 @@ contract Delaney {
         // 开始发放团队奖励
         startRef = ref;
         preStar = 0;
-        address[] memory teamRewardAddress;
-        uint teamRewardAddressCount = 0;
+        uint preRaito = 0;
         while (true) {
             Delegation storage curDelegation = delegations[refToUser[startRef]];
             if (curDelegation.parent == zeroAddress) {
@@ -185,17 +184,30 @@ contract Delaney {
             }
             // 如果星数相同，我们只管离投资者最近的
             if (curDelegation.star > preStar) {
+                uint curRaito = teamRewardRaito(curDelegation.star);
+                uint teamRaito = curRaito - preRaito;
+                curDelegation.teamDynamicReward += (amount * teamRaito) / 100;
+
                 preStar = curDelegation.star;
-                teamRewardAddress[teamRewardAddressCount] = curDelegation.user;
-                teamRewardAddressCount++;
+                preRaito = curRaito;
             }
 
-            if (curDelegation.star >= maxStar) {
+            // 迭代到五星了
+            if (curDelegation.star == maxStar) {
                 break;
             }
 
             // 继续往上迭代
             startRef = curDelegation.ref;
         }
+    }
+
+    function teamRewardRaito(uint star) public pure returns (uint) {
+        if (star == 5) return 15;
+        if (star == 4) return 12;
+        if (star == 3) return 9;
+        if (star == 2) return 6;
+        if (star == 1) return 3;
+        return 0;
     }
 }
