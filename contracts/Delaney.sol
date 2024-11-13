@@ -4,6 +4,8 @@ pragma solidity ^0.8.27;
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
+// 需求：管理员可以更新星级
+
 contract Delaney {
     address public zeroAddress = address(0);
     address public owner;
@@ -17,8 +19,10 @@ contract Delaney {
     struct Delegate {
         uint id;
         uint timestamp; // 质押时间
+        uint height;
         uint amount; // 每次质押数量
         uint usdt; // 数量对应usdt的价值
+        bool redelegate;
     }
 
     struct Delegation {
@@ -27,7 +31,7 @@ contract Delaney {
         Delegate[] delegates;
         address[] children; // 子节点
         uint star; // 星级
-        uint[5] chindStars; // 每个等级对应的星数
+        uint[6] chindStars; // 每个等级对应的星数
         uint selfDelegateMud; // 自己质押MUD数量
         uint teamDelegateMud; // 团队质押MUD数量
         uint directDelegateMud; // 直推质押MUD数量
@@ -37,13 +41,14 @@ contract Delaney {
         uint ref; // 我的邀请码（只有质押才能产生）
         uint tierDynamicReward; // 层级动态奖励
         uint teamDynamicReward; // 团队动态奖励
-        uint withdrawDynamicReward; // 已领取团队动态奖励
+        uint withdrawDynamicReward; // 已领取动态奖励
     }
 
     mapping(address => Delegation) delegations;
 
     mapping(address => uint) userToRef;
     mapping(uint => address) refToUser;
+    mapping(address => uint) binds; // 用户用的哪个推荐码
 
     constructor(address _owner, uint startRef) {
         require(startRef > 0, "startRef > 0");
@@ -52,14 +57,34 @@ contract Delaney {
         ownerRef = startRef;
     }
 
-    function delegate(uint amount, uint ref) public {
-        uint usdt = amount; // 通过 Uniswap 拿到 USDT 的价格
-        address parent = msg.sender != owner ? refToUser[ref] : zeroAddress;
+    function teamRewardRaito(uint star) public pure returns (uint) {
+        if (star == 5) return 15;
+        if (star == 4) return 12;
+        if (star == 3) return 9;
+        if (star == 2) return 6;
+        if (star == 1) return 3;
+        return 0;
+    }
 
+    function bind(uint ref) public {
         require(ref > 0 && ref <= curRef, "ref > 0 && ref <= curRef");
+        require(
+            binds[msg.sender] == 0,
+            "changing the ref code is not allowed."
+        );
+        binds[msg.sender] = ref;
+    }
+
+    function delegate(uint amount) public {
+        uint usdt = amount; // 通过 Uniswap 拿到 USDT 的价格
+        uint ref = binds[msg.sender];
+
         require(usdt > 100, "usdt > 100");
+
+        address parent = msg.sender != owner ? refToUser[ref] : zeroAddress;
         if (msg.sender != owner) {
             require(parent != zeroAddress, "you ref is not exist");
+            require(ref > 0, "you have not bind an invitation code yet");
         }
 
         Delegation storage delegation = delegations[msg.sender];
@@ -137,7 +162,7 @@ contract Delaney {
             curDelegation.teamDelegateMud += amount;
             curDelegation.teamDelegateUsdt += usdt;
 
-            if (preStar > 0) {
+            if (preStar >= 1) {
                 // 孩子升星了，看看自己能不能也升一把
                 curDelegation.chindStars[preStar - 1] -= 1;
                 curDelegation.chindStars[preStar] += 1;
@@ -146,9 +171,11 @@ contract Delaney {
                 // 如果孩子从0个一星到1个一星，自己不升级
                 // 如果孩子从1个一星到2个一星，自己升级
                 // 如果孩子从2个一星到3个一星，自己已经升级过了，不再升级
+                // 注意: 不能跨越升级，比如孩子是一星，自己本身已经是四星了，那么不能从四星升级到五星
                 if (
                     curDelegation.star == preStar &&
-                    curDelegation.chindStars[preStar] == 2
+                    curDelegation.chindStars[preStar] == 2 &&
+                    curDelegation.star == preStar + 1
                 ) {
                     // 注意最大只能是五星
                     curDelegation.star = curDelegation.star >= maxStar
@@ -179,9 +206,6 @@ contract Delaney {
         uint preRaito = 0;
         while (true) {
             Delegation storage curDelegation = delegations[refToUser[startRef]];
-            if (curDelegation.parent == zeroAddress) {
-                break;
-            }
             // 如果星数相同，我们只管离投资者最近的
             if (curDelegation.star > preStar) {
                 uint curRaito = teamRewardRaito(curDelegation.star);
@@ -199,15 +223,10 @@ contract Delaney {
 
             // 继续往上迭代
             startRef = curDelegation.ref;
-        }
-    }
 
-    function teamRewardRaito(uint star) public pure returns (uint) {
-        if (star == 5) return 15;
-        if (star == 4) return 12;
-        if (star == 3) return 9;
-        if (star == 2) return 6;
-        if (star == 1) return 3;
-        return 0;
+            if (curDelegation.parent == zeroAddress) {
+                break;
+            }
+        }
     }
 }
