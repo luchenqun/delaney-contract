@@ -22,6 +22,10 @@ contract UniswapV3Pool {
 
     Slot0 public slot0;
 
+    constructor() {
+        slot0.sqrtPriceX96 = 172320422218022955475897422335; // 210123
+    }
+
     function setSqrtPriceX96(uint160 sqrtPriceX96) public {
         slot0.sqrtPriceX96 = sqrtPriceX96;
     }

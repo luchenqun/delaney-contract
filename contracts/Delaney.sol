@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
@@ -130,33 +131,66 @@ library FullMath {
     }
 }
 
+interface IUniswapV3Pool {
+    function slot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        );
+}
+
 contract Delaney is Pausable, Ownable {
+    event Delegate(
+        address indexed delegator,
+        uint256 mud,
+        uint256 usdt,
+        uint256 unlockTime
+    );
+
     struct Delegation {
         uint id;
-        address sender;
+        address delegator;
         uint mud; // 每次质押数量
         uint usdt; // 数量对应usdt的价值
         uint unlockTime; // 解锁时间
         bool withdrawn;
     }
 
+    address public poolAddress;
+    address public mudAddress;
     uint public periodDuration = 15 * 24 * 3600; // 15 day
     uint public periodNum = 8;
     uint public minPersonInvestUsdt = 100000000; // 100usdt
     uint public totalDelegate = 0; //
     mapping(uint => Delegation) public delegations;
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(
+        address initialOwner,
+        address initalPoolAddress,
+        address initalMudAddress
+    ) Ownable(initialOwner) {
+        poolAddress = initalPoolAddress;
+        mudAddress = initalMudAddress;
+    }
 
-    function mudPrice(uint160 sqrtPriceX96) public pure returns (uint256) {
+    function mudPrice() public view returns (uint256) {
+        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
+        (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         uint8 decimalsMud = 6;
         uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
         uint256 numerator2 = 10 ** decimalsMud;
+        uint256 price = ((numerator2 * numerator2) /
+            FullMath.mulDiv(numerator1, numerator2, 1 << 192));
 
-        return
-            (((numerator2 * numerator2) /
-                FullMath.mulDiv(numerator1, numerator2, 1 << 192)) * 994) /
-            1000;
+        // 收取了6个点的手续费
+        return (price * 994) / 1000;
     }
 
     function delegate(
@@ -164,18 +198,29 @@ contract Delaney is Pausable, Ownable {
         uint usdtMin,
         uint deadline
     ) public whenNotPaused {
+        uint usdt = mudPrice() * mud; // polygon中的usdt也是 6 位小数
+
         require(block.timestamp >= deadline);
+        require(usdt >= usdtMin);
+        require(usdt >= minPersonInvestUsdt);
+
+        IERC20 mudToken = IERC20(mudAddress);
+        bool success = mudToken.transferFrom(msg.sender, address(this), mud);
+        require(success, "Token transfer failed");
 
         Delegation memory delegation;
+        uint unlockTime = block.timestamp + periodDuration * periodNum;
         delegation.id = totalDelegate;
-        delegation.sender = msg.sender;
+        delegation.delegator = msg.sender;
         delegation.mud = mud;
-        delegation.usdt = usdtMin;
-        delegation.unlockTime = block.timestamp + periodDuration * periodNum;
+        delegation.usdt = usdt;
+        delegation.unlockTime = unlockTime;
         delegation.withdrawn = false;
         delegations[totalDelegate] = delegation;
 
         totalDelegate += 1;
+
+        emit Delegate(msg.sender, mud, usdt, unlockTime);
     }
 
     function pause() public onlyOwner {
