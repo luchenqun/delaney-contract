@@ -1,232 +1,188 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.27;
+// SPDX-License-Identifier: MIT
+// Compatible with OpenZeppelin Contracts ^5.0.0
+pragma solidity ^0.8.22;
+
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
-// 需求：管理员可以更新星级
+/// @title Contains 512-bit math functions
+/// @notice Facilitates multiplication and division that can have overflow of an intermediate value without any loss of precision
+/// @dev Handles "phantom overflow" i.e., allows multiplication and division where an intermediate value overflows 256 bits
+library FullMath {
+    /// @notice Calculates floor(a×b÷denominator) with full precision. Throws if result overflows a uint256 or denominator == 0
+    /// @param a The multiplicand
+    /// @param b The multiplier
+    /// @param denominator The divisor
+    /// @return result The 256-bit result
+    /// @dev Credit to Remco Bloemen under MIT license https://xn--2-umb.com/21/muldiv
+    function mulDiv(
+        uint256 a,
+        uint256 b,
+        uint256 denominator
+    ) internal pure returns (uint256 result) {
+        // 512-bit multiply [prod1 prod0] = a * b
+        // Compute the product mod 2**256 and mod 2**256 - 1
+        // then use the Chinese Remainder Theorem to reconstruct
+        // the 512 bit result. The result is stored in two 256
+        // variables such that product = prod1 * 2**256 + prod0
+        uint256 prod0; // Least significant 256 bits of the product
+        uint256 prod1; // Most significant 256 bits of the product
+        assembly {
+            let mm := mulmod(a, b, not(0))
+            prod0 := mul(a, b)
+            prod1 := sub(sub(mm, prod0), lt(mm, prod0))
+        }
 
-contract Delaney {
-    address public zeroAddress = address(0);
-    address public owner;
-    uint curRef; // 系统当前推荐码
-    uint ownerRef; // 项目方推荐码
+        // Handle non-overflow cases, 256 by 256 division
+        if (prod1 == 0) {
+            require(denominator > 0);
+            assembly {
+                result := div(prod0, denominator)
+            }
+            return result;
+        }
 
-    uint minPersonInvestUsdt = 100;
-    uint minTeamInvestUsdt = 1000;
-    uint maxStar = 5;
+        // Make sure the result is less than 2**256.
+        // Also prevents denominator == 0
+        require(denominator > prod1);
 
-    struct Delegate {
-        uint id;
-        uint timestamp; // 质押时间
-        uint height;
-        uint amount; // 每次质押数量
-        uint usdt; // 数量对应usdt的价值
-        bool redelegate;
+        ///////////////////////////////////////////////
+        // 512 by 256 division.
+        ///////////////////////////////////////////////
+
+        // Make division exact by subtracting the remainder from [prod1 prod0]
+        // Compute remainder using mulmod
+        uint256 remainder;
+        assembly {
+            remainder := mulmod(a, b, denominator)
+        }
+        // Subtract 256 bit number from 512 bit number
+        assembly {
+            prod1 := sub(prod1, gt(remainder, prod0))
+            prod0 := sub(prod0, remainder)
+        }
+
+        // Factor powers of two out of denominator
+        // Compute largest power of two divisor of denominator.
+        // Always >= 1.
+        uint256 twos = denominator & (~denominator + 1);
+        // Divide denominator by power of two
+        assembly {
+            denominator := div(denominator, twos)
+        }
+
+        // Divide [prod1 prod0] by the factors of two
+        assembly {
+            prod0 := div(prod0, twos)
+        }
+        // Shift in bits from prod1 into prod0. For this we need
+        // to flip `twos` such that it is 2**256 / twos.
+        // If twos is zero, then it becomes one
+        assembly {
+            twos := add(div(sub(0, twos), twos), 1)
+        }
+        prod0 |= prod1 * twos;
+
+        // Invert denominator mod 2**256
+        // Now that denominator is an odd number, it has an inverse
+        // modulo 2**256 such that denominator * inv = 1 mod 2**256.
+        // Compute the inverse by starting with a seed that is correct
+        // correct for four bits. That is, denominator * inv = 1 mod 2**4
+        uint256 inv = (3 * denominator) ^ 2;
+        // Now use Newton-Raphson iteration to improve the precision.
+        // Thanks to Hensel's lifting lemma, this also works in modular
+        // arithmetic, doubling the correct bits in each step.
+        inv *= 2 - denominator * inv; // inverse mod 2**8
+        inv *= 2 - denominator * inv; // inverse mod 2**16
+        inv *= 2 - denominator * inv; // inverse mod 2**32
+        inv *= 2 - denominator * inv; // inverse mod 2**64
+        inv *= 2 - denominator * inv; // inverse mod 2**128
+        inv *= 2 - denominator * inv; // inverse mod 2**256
+
+        // Because the division is now exact we can divide by multiplying
+        // with the modular inverse of denominator. This will give us the
+        // correct result modulo 2**256. Since the precoditions guarantee
+        // that the outcome is less than 2**256, this is the final result.
+        // We don't need to compute the high bits of the result and prod1
+        // is no longer required.
+        result = prod0 * inv;
+        return result;
     }
 
+    /// @notice Calculates ceil(a×b÷denominator) with full precision. Throws if result overflows a uint256 or denominator == 0
+    /// @param a The multiplicand
+    /// @param b The multiplier
+    /// @param denominator The divisor
+    /// @return result The 256-bit result
+    function mulDivRoundingUp(
+        uint256 a,
+        uint256 b,
+        uint256 denominator
+    ) internal pure returns (uint256 result) {
+        result = mulDiv(a, b, denominator);
+        if (mulmod(a, b, denominator) > 0) {
+            require(result < type(uint256).max);
+            result++;
+        }
+    }
+}
+
+contract Delaney is Pausable, Ownable {
     struct Delegation {
-        address user; // 用户地址
-        address parent; // 推荐人
-        Delegate[] delegates;
-        address[] children; // 子节点
-        uint star; // 星级
-        uint[6] chindStars; // 每个等级对应的星数
-        uint selfDelegateMud; // 自己质押MUD数量
-        uint teamDelegateMud; // 团队质押MUD数量
-        uint directDelegateMud; // 直推质押MUD数量
-        uint selfDelegateUsdt; // 自己质押的MUD对应USDT数量
-        uint teamDelegateUsdt; // 团队质押的MUD对应USDT数量
-        uint directDelegateUsdt; // 直推质押的MUD对应USDT数量
-        uint ref; // 我的邀请码（只有质押才能产生）
-        uint tierDynamicReward; // 层级动态奖励
-        uint teamDynamicReward; // 团队动态奖励
-        uint withdrawDynamicReward; // 已领取动态奖励
+        uint id;
+        address sender;
+        uint mud; // 每次质押数量
+        uint usdt; // 数量对应usdt的价值
+        uint unlockTime; // 解锁时间
+        bool withdrawn;
     }
 
-    mapping(address => Delegation) delegations;
+    uint public periodDuration = 15 * 24 * 3600; // 15 day
+    uint public periodNum = 8;
+    uint public minPersonInvestUsdt = 100000000; // 100usdt
+    uint public totalDelegate = 0; //
+    mapping(uint => Delegation) public delegations;
 
-    mapping(address => uint) userToRef;
-    mapping(uint => address) refToUser;
-    mapping(address => uint) binds; // 用户用的哪个推荐码
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
-    constructor(address _owner, uint startRef) {
-        require(startRef > 0, "startRef > 0");
-        owner = _owner;
-        curRef = startRef;
-        ownerRef = startRef;
+    function mudPrice(uint160 sqrtPriceX96) public pure returns (uint256) {
+        uint8 decimalsMud = 6;
+        uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+        uint256 numerator2 = 10 ** decimalsMud;
+
+        return
+            (((numerator2 * numerator2) /
+                FullMath.mulDiv(numerator1, numerator2, 1 << 192)) * 994) /
+            1000;
     }
 
-    function teamRewardRaito(uint star) public pure returns (uint) {
-        if (star == 5) return 15;
-        if (star == 4) return 12;
-        if (star == 3) return 9;
-        if (star == 2) return 6;
-        if (star == 1) return 3;
-        return 0;
+    function delegate(
+        uint mud,
+        uint usdtMin,
+        uint deadline
+    ) public whenNotPaused {
+        require(block.timestamp >= deadline);
+
+        Delegation memory delegation;
+        delegation.id = totalDelegate;
+        delegation.sender = msg.sender;
+        delegation.mud = mud;
+        delegation.usdt = usdtMin;
+        delegation.unlockTime = block.timestamp + periodDuration * periodNum;
+        delegation.withdrawn = false;
+        delegations[totalDelegate] = delegation;
+
+        totalDelegate += 1;
     }
 
-    function bind(uint ref) public {
-        require(ref > 0 && ref <= curRef, "ref > 0 && ref <= curRef");
-        require(
-            binds[msg.sender] == 0,
-            "changing the ref code is not allowed."
-        );
-        binds[msg.sender] = ref;
+    function pause() public onlyOwner {
+        _pause();
     }
 
-    function delegate(uint amount) public {
-        uint usdt = amount; // 通过 Uniswap 拿到 USDT 的价格
-        uint ref = binds[msg.sender];
-
-        require(usdt > 100, "usdt > 100");
-
-        address parent = msg.sender != owner ? refToUser[ref] : zeroAddress;
-        if (msg.sender != owner) {
-            require(parent != zeroAddress, "you ref is not exist");
-            require(ref > 0, "you have not bind an invitation code yet");
-        }
-
-        Delegation storage delegation = delegations[msg.sender];
-        delegation.user = msg.sender;
-        delegation.parent = parent;
-        delegation.delegates.push(
-            Delegate({
-                timestamp: block.timestamp,
-                amount: amount,
-                usdt: usdt,
-                id: delegation.delegates.length
-            })
-        );
-        delegation.selfDelegateMud += amount;
-        delegation.selfDelegateUsdt += usdt;
-
-        // 第一次质押需要给自己产生一个邀请码
-        if (delegation.ref == 0) {
-            if (msg.sender == owner) {
-                delegation.ref = ownerRef;
-            } else {
-                curRef = curRef + 1;
-                delegation.ref = curRef;
-            }
-
-            refToUser[delegation.ref] = msg.sender;
-            userToRef[msg.sender] = delegation.ref;
-
-            delegation.chindStars[0] = delegation.chindStars[0] + 1; // 多1个0星的用户
-            delegations[msg.sender] = delegation;
-        }
-
-        // 将自己加入到上级的子节点列表里面
-        // 更新直推相关数据
-        if (msg.sender != owner) {
-            Delegation storage parentDelegation = delegations[parent];
-            bool find = false;
-            for (uint i = 0; i < parentDelegation.children.length; i++) {
-                if (parentDelegation.children[i] == msg.sender) {
-                    find = true;
-                }
-            }
-            parentDelegation.children.push(msg.sender);
-            parentDelegation.directDelegateMud += amount;
-            parentDelegation.directDelegateUsdt += usdt;
-        }
-
-        // 往上发放奖励
-        uint8 depth = 5; // 最多奖励5层
-        uint8 ratio = 3; // 从3%开始奖励
-        uint startRef = ref;
-        for (uint8 i = 0; i < depth; i++) {
-            Delegation storage curDelegation = delegations[refToUser[startRef]];
-            // 有可能不够5层，就已经到达了顶点，那么停止发放奖励
-            if (curDelegation.parent == zeroAddress) {
-                break;
-            }
-            // 发放层级奖励
-            curDelegation.tierDynamicReward += (amount * ratio) / 100;
-            ratio += 1;
-
-            // 继续往上迭代
-            startRef = curDelegation.ref;
-        }
-
-        // 更新团队质押的数量以及星级
-        startRef = ref;
-        uint preStar = 0; // 0表示孩子没有升级
-        while (true) {
-            Delegation storage curDelegation = delegations[refToUser[startRef]];
-            if (curDelegation.parent == zeroAddress) {
-                break;
-            }
-            // 逐级往上更新团队的mud数量以及usdt数量
-            curDelegation.teamDelegateMud += amount;
-            curDelegation.teamDelegateUsdt += usdt;
-
-            if (preStar >= 1) {
-                // 孩子升星了，看看自己能不能也升一把
-                curDelegation.chindStars[preStar - 1] -= 1;
-                curDelegation.chindStars[preStar] += 1;
-
-                // 如果刚好相差一级，且孩子升完之后是2个，则自己也要升级，比如：
-                // 如果孩子从0个一星到1个一星，自己不升级
-                // 如果孩子从1个一星到2个一星，自己升级
-                // 如果孩子从2个一星到3个一星，自己已经升级过了，不再升级
-                // 注意: 不能跨越升级，比如孩子是一星，自己本身已经是四星了，那么不能从四星升级到五星
-                if (
-                    curDelegation.star == preStar &&
-                    curDelegation.chindStars[preStar] == 2 &&
-                    curDelegation.star == preStar + 1
-                ) {
-                    // 注意最大只能是五星
-                    curDelegation.star = curDelegation.star >= maxStar
-                        ? maxStar
-                        : curDelegation.star + 1;
-                    preStar = curDelegation.star;
-                }
-            } else if (curDelegation.star == 0) {
-                // 看看自己是否需要升星(理论上只要)
-                if (
-                    curDelegation.directDelegateUsdt >= 5000 &&
-                    curDelegation.teamDelegateUsdt >= 20000
-                ) {
-                    curDelegation.star = 1;
-                    preStar = curDelegation.star;
-                }
-            } else {
-                preStar = 0; // 本次自己没有升星清空升星变量
-            }
-
-            // 继续往上迭代
-            startRef = curDelegation.ref;
-        }
-
-        // 开始发放团队奖励
-        startRef = ref;
-        preStar = 0;
-        uint preRaito = 0;
-        while (true) {
-            Delegation storage curDelegation = delegations[refToUser[startRef]];
-            // 如果星数相同，我们只管离投资者最近的
-            if (curDelegation.star > preStar) {
-                uint curRaito = teamRewardRaito(curDelegation.star);
-                uint teamRaito = curRaito - preRaito;
-                curDelegation.teamDynamicReward += (amount * teamRaito) / 100;
-
-                preStar = curDelegation.star;
-                preRaito = curRaito;
-            }
-
-            // 迭代到五星了
-            if (curDelegation.star == maxStar) {
-                break;
-            }
-
-            // 继续往上迭代
-            startRef = curDelegation.ref;
-
-            if (curDelegation.parent == zeroAddress) {
-                break;
-            }
-        }
+    function unpause() public onlyOwner {
+        _unpause();
     }
 }
