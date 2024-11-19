@@ -154,6 +154,15 @@ contract Delaney is Pausable, Ownable {
         uint256 unlockTime
     );
 
+    event Claim(
+        address indexed delegator,
+        uint256 usdt,
+        uint256 mud,
+        string reward
+    );
+
+    event Withdraw(address indexed delegator, uint256 usdt, uint256 mud);
+
     struct Delegation {
         uint id;
         address delegator;
@@ -165,19 +174,48 @@ contract Delaney is Pausable, Ownable {
 
     address public poolAddress;
     address public mudAddress;
+    address public signerAddress;
     uint public periodDuration = 15 * 24 * 3600; // 15 day
     uint public periodNum = 8;
     uint public minPersonInvestUsdt = 100000000; // 100usdt
+    uint public fee = 1; // 1%的手续费
     uint public totalDelegate = 0; //
+
     mapping(uint => Delegation) public delegations;
+    mapping(address => uint) lastClaimTimestamp;
 
     constructor(
         address initialOwner,
         address initalPoolAddress,
-        address initalMudAddress
+        address initalMudAddress,
+        address initalSignerAddress
     ) Ownable(initialOwner) {
         poolAddress = initalPoolAddress;
         mudAddress = initalMudAddress;
+        signerAddress = initalSignerAddress;
+    }
+
+    //function to get the public address of the signer
+    function recoverSignerFromSignature(
+        bytes32 message,
+        bytes memory signature
+    ) internal pure returns (address) {
+        require(signature.length == 65);
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        assembly {
+            // first 32 bytes, after the length prefix
+            r := mload(add(signature, 32))
+            // second 32 bytes
+            s := mload(add(signature, 64))
+            // final byte (first byte of the next 32 bytes)
+            v := byte(0, mload(add(signature, 96)))
+        }
+
+        return ecrecover(message, v, r, s);
     }
 
     function mudPrice() public view returns (uint256) {
@@ -193,6 +231,7 @@ contract Delaney is Pausable, Ownable {
         return (price * 994) / 1000;
     }
 
+    // 质押mud
     function delegate(
         uint mud,
         uint usdtMin,
@@ -200,9 +239,15 @@ contract Delaney is Pausable, Ownable {
     ) public whenNotPaused {
         uint usdt = mudPrice() * mud; // polygon中的usdt也是 6 位小数
 
-        require(block.timestamp >= deadline);
-        require(usdt >= usdtMin);
-        require(usdt >= minPersonInvestUsdt);
+        require(deadline >= block.timestamp, "Delegate expired");
+        require(
+            usdt >= usdtMin,
+            "Delegate mud corresponding usdt does not meet your minimum requirement"
+        );
+        require(
+            usdt >= minPersonInvestUsdt,
+            "Delegate mud corresponding usdt does not meet system minimum requirement"
+        );
 
         IERC20 mudToken = IERC20(mudAddress);
         bool success = mudToken.transferFrom(msg.sender, address(this), mud);
@@ -221,6 +266,74 @@ contract Delaney is Pausable, Ownable {
         totalDelegate += 1;
 
         emit Delegate(msg.sender, mud, usdt, unlockTime);
+    }
+
+    // 领取奖励
+    // reward 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
+    function claim(
+        uint usdt,
+        uint mudMin,
+        string memory claimIds,
+        bytes memory signature,
+        uint deadline
+    ) public whenNotPaused {
+        uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
+        // TODO
+        address signer = recoverSignerFromSignature(
+            bytes32(uint256(140714483853992465185976883)),
+            signature
+        );
+
+        require(
+            signer == signerAddress,
+            "Administrator signature is required for claim"
+        );
+        require(
+            block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
+            "You can claim only once per day"
+        );
+        require(deadline >= block.timestamp, "Claim expired");
+        require(
+            mud >= mudMin,
+            "Claim mud does not meet your minimum requirement"
+        );
+
+        IERC20 mudToken = IERC20(mudAddress);
+        uint256 balance = mudToken.balanceOf(address(this));
+        require(balance >= mud, "Insufficient balance in the contract");
+        bool success = mudToken.transfer(msg.sender, mud);
+        require(success, "Token transfer failed");
+
+        emit Claim(msg.sender, usdt, mud, claimIds);
+    }
+
+    // 结束质押
+    function withdraw(
+        uint delegateId,
+        uint mudMin,
+        uint deadline
+    ) public whenNotPaused {
+        Delegation memory delegation = delegations[delegateId];
+        uint mud = delegation.usdt / mudPrice();
+
+        require(deadline >= block.timestamp, "Withdraw expired");
+        require(
+            block.timestamp > delegation.unlockTime,
+            "You can't withdraw yet"
+        );
+        require(delegation.delegator == msg.sender, "You aren't the delegator");
+        require(
+            mud >= mudMin,
+            "Withdraw mud does not meet your minimum requirement"
+        );
+
+        IERC20 mudToken = IERC20(mudAddress);
+        uint256 balance = mudToken.balanceOf(address(this));
+        require(balance >= mud, "Insufficient balance in the contract");
+        bool success = mudToken.transfer(msg.sender, mud);
+        require(success, "Token transfer failed");
+
+        emit Withdraw(msg.sender, delegation.usdt, mud);
     }
 
     function pause() public onlyOwner {
