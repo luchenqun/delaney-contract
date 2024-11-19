@@ -158,10 +158,14 @@ contract Delaney is Pausable, Ownable {
         address indexed delegator,
         uint256 usdt,
         uint256 mud,
-        string reward
+        string claimIds
     );
 
     event Withdraw(address indexed delegator, uint256 usdt, uint256 mud);
+
+    event Deposit(address indexed Depositer, uint256 mud);
+
+    event Profit(address indexed owner, uint256 mud);
 
     struct Delegation {
         uint id;
@@ -334,6 +338,30 @@ contract Delaney is Pausable, Ownable {
         require(success, "Token transfer failed");
 
         emit Withdraw(msg.sender, delegation.usdt, mud);
+    }
+
+    // 存储
+    // 如果mud币价跌了，项目方则必须存入mud进行赔付
+    function deposit(uint mud) public whenNotPaused {
+        IERC20 mudToken = IERC20(mudAddress);
+        uint256 balance = mudToken.balanceOf(address(this));
+        require(balance >= mud, "Insufficient balance in the contract");
+        bool success = mudToken.transfer(msg.sender, mud);
+        require(success, "Token transfer failed");
+
+        emit Deposit(msg.sender, mud);
+    }
+
+    // 利润
+    // 如果币价涨了，项目方可以把利润即结余的mud取出来
+    function profit(uint mud) public onlyOwner whenNotPaused {
+        IERC20 mudToken = IERC20(mudAddress);
+        uint256 balance = mudToken.balanceOf(address(this));
+        require(balance >= mud, "Insufficient balance in the contract");
+        bool success = mudToken.transfer(msg.sender, mud);
+        require(success, "Token transfer failed");
+
+        emit Profit(msg.sender, mud);
     }
 
     function pause() public onlyOwner {
