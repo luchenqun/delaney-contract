@@ -273,7 +273,7 @@ contract Delaney is Pausable, Ownable {
     }
 
     // 领取奖励
-    // reward 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
+    // claimIds 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
     function claim(
         uint usdt,
         uint mudMin,
