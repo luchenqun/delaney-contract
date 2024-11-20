@@ -381,4 +381,35 @@ contract Delaney is Pausable, Ownable {
     function unpause() public onlyOwner {
         _unpause();
     }
+
+    // 验证签名
+    // 管理员进行对原始数据签名，通过此方法验证是否为管理员签名
+    function verifySign(
+        address signer,
+        string data,     
+        bytes memory signature
+    ) internal pure returns (bool) {
+        bytes32 messageHash = keccak256(abi.encodePacked(data));
+
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", messageHash));
+
+        (bytes32 r, bytes32 s, uint8 v) = splitSign(signature);
+        address recoveredSigner = ecrecover(ethSignedMessageHash, v, r, s);
+
+        return (recoveredSigner == signer);
+    }
+
+    function splitSign(bytes memory sig) private pure returns (bytes32 r, bytes32 s, uint8 v) {
+        require(sig.length == 65, "Invalid signature length");
+
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := and(mload(add(sig, 96)), 0xff) 
+        }
+
+        if (v < 27) {
+            v +=27;
+        }
+    }
 }
