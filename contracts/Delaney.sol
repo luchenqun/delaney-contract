@@ -249,7 +249,7 @@ contract Delaney is Pausable, Ownable {
         uint minUsdt,
         uint deadline
     ) public whenNotPaused {
-        uint usdt = mudPrice() * mud; // polygon中的usdt也是 6 位小数
+        uint usdt = (mudPrice() * mud) / 1000000; // polygon中的usdt也是 6 位小数
 
         require(deadline >= block.timestamp, "Delegate expired");
         require(
