@@ -149,6 +149,7 @@ interface IUniswapV3Pool {
 contract Delaney is Pausable, Ownable {
     event Delegate(
         address indexed delegator,
+        uint256 id,
         uint256 mud,
         uint256 usdt,
         uint256 unlockTime
@@ -161,7 +162,12 @@ contract Delaney is Pausable, Ownable {
         string claimIds
     );
 
-    event Withdraw(address indexed delegator, uint256 usdt, uint256 mud);
+    event Withdraw(
+        address indexed delegator,
+        uint256 id,
+        uint256 usdt,
+        uint256 mud
+    );
 
     event Deposit(address indexed Depositer, uint256 mud);
 
@@ -238,14 +244,14 @@ contract Delaney is Pausable, Ownable {
     // 质押mud
     function delegate(
         uint mud,
-        uint usdtMin,
+        uint minUsdt,
         uint deadline
     ) public whenNotPaused {
         uint usdt = mudPrice() * mud; // polygon中的usdt也是 6 位小数
 
         require(deadline >= block.timestamp, "Delegate expired");
         require(
-            usdt >= usdtMin,
+            usdt >= minUsdt,
             "Delegate mud corresponding usdt does not meet your minimum requirement"
         );
         require(
@@ -269,14 +275,14 @@ contract Delaney is Pausable, Ownable {
 
         totalDelegate += 1;
 
-        emit Delegate(msg.sender, mud, usdt, unlockTime);
+        emit Delegate(msg.sender, delegation.id, mud, usdt, unlockTime);
     }
 
     // 领取奖励
     // claimIds 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
     function claim(
         uint usdt,
-        uint mudMin,
+        uint minMud,
         string memory claimIds,
         bytes memory signature,
         uint deadline
@@ -298,7 +304,7 @@ contract Delaney is Pausable, Ownable {
         );
         require(deadline >= block.timestamp, "Claim expired");
         require(
-            mud >= mudMin,
+            mud >= minMud,
             "Claim mud does not meet your minimum requirement"
         );
 
@@ -313,11 +319,11 @@ contract Delaney is Pausable, Ownable {
 
     // 结束质押
     function withdraw(
-        uint delegateId,
-        uint mudMin,
+        uint id,
+        uint minMud,
         uint deadline
     ) public whenNotPaused {
-        Delegation memory delegation = delegations[delegateId];
+        Delegation memory delegation = delegations[id];
         uint mud = delegation.usdt / mudPrice();
 
         require(deadline >= block.timestamp, "Withdraw expired");
@@ -327,7 +333,7 @@ contract Delaney is Pausable, Ownable {
         );
         require(delegation.delegator == msg.sender, "You aren't the delegator");
         require(
-            mud >= mudMin,
+            mud >= minMud,
             "Withdraw mud does not meet your minimum requirement"
         );
 
@@ -337,7 +343,7 @@ contract Delaney is Pausable, Ownable {
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
 
-        emit Withdraw(msg.sender, delegation.usdt, mud);
+        emit Withdraw(msg.sender, id, delegation.usdt, mud);
     }
 
     // 存储
