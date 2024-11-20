@@ -190,13 +190,13 @@ contract Delaney is Pausable, Ownable {
 
     constructor(
         address initialOwner,
+        address initalSignerAddress,
         address initalPoolAddress,
-        address initalMudAddress,
-        address initalSignerAddress
+        address initalMudAddress
     ) Ownable(initialOwner) {
+        signerAddress = initalSignerAddress;
         poolAddress = initalPoolAddress;
         mudAddress = initalMudAddress;
-        signerAddress = initalSignerAddress;
     }
 
     //function to get the public address of the signer

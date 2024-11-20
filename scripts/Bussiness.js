@@ -14,7 +14,7 @@ async function main() {
   console.log(`pool contract deployed to ${pool.target}`);
 
   const Delaney = await ethers.getContractFactory('Delaney');
-  const delaney = await Delaney.deploy(owner.address, pool.target, mudToken.target, owner.address);
+  const delaney = await Delaney.deploy(owner.address, owner.address, pool.target, mudToken.target);
   await delaney.waitForDeployment();
   console.log(`delaney contract deployed to ${delaney.target}`);
 
