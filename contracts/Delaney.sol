@@ -178,8 +178,10 @@ contract Delaney is Pausable, Ownable {
         address delegator;
         uint mud; // 每次质押数量
         uint usdt; // 数量对应usdt的价值
+        uint periodDuration;
+        uint periodNum;
         uint unlockTime; // 解锁时间
-        bool withdrawn;
+        bool withdrew;
     }
 
     address public poolAddress;
@@ -270,7 +272,9 @@ contract Delaney is Pausable, Ownable {
         delegation.mud = mud;
         delegation.usdt = usdt;
         delegation.unlockTime = unlockTime;
-        delegation.withdrawn = false;
+        delegation.periodDuration = periodDuration;
+        delegation.periodNum = periodNum;
+        delegation.withdrew = false;
         delegations[totalDelegate] = delegation;
 
         totalDelegate += 1;
