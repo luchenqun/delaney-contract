@@ -159,7 +159,7 @@ contract Delaney is Pausable, Ownable {
         address indexed delegator,
         uint256 usdt,
         uint256 mud,
-        string claimIds
+        string rewardIds
     );
 
     event Withdraw(
@@ -283,11 +283,11 @@ contract Delaney is Pausable, Ownable {
     }
 
     // 领取奖励
-    // claimIds 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
+    // rewardIds 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
     function claim(
         uint usdt,
         uint minMud,
-        string memory claimIds,
+        string memory rewardIds,
         bytes memory signature,
         uint deadline
     ) public whenNotPaused {
@@ -318,7 +318,7 @@ contract Delaney is Pausable, Ownable {
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
 
-        emit Claim(msg.sender, usdt, mud, claimIds);
+        emit Claim(msg.sender, usdt, mud, rewardIds);
     }
 
     // 结束质押
