@@ -157,6 +157,7 @@ contract Delaney is Pausable, Ownable {
 
     event Claim(
         address indexed delegator,
+        uint256 id,
         uint256 usdt,
         uint256 mud,
         string rewardIds
@@ -185,6 +186,14 @@ contract Delaney is Pausable, Ownable {
         bool withdrew;
     }
 
+    struct Claimant {
+        uint id;
+        address delegator;
+        uint minMud;
+        uint usdt;
+        uint deadline;
+    }
+
     address public poolAddress;
     address public mudAddress;
     address public signerAddress;
@@ -193,9 +202,11 @@ contract Delaney is Pausable, Ownable {
     uint public minPersonInvestUsdt = 100000000; // 100usdt
     uint public fee = 1; // 1%的手续费
     uint public totalDelegate = 0; //
+    uint public totalClaim = 0;
 
     mapping(uint => Delegation) public delegations;
     mapping(address => uint) lastClaimTimestamp;
+    mapping(uint => Claimant) public claimants;
 
     constructor(
         address initialOwner,
@@ -206,29 +217,6 @@ contract Delaney is Pausable, Ownable {
         signerAddress = initalSignerAddress;
         poolAddress = initalPoolAddress;
         mudAddress = initalMudAddress;
-    }
-
-    //function to get the public address of the signer
-    function recoverSignerFromSignature(
-        bytes32 message,
-        bytes memory signature
-    ) internal pure returns (address) {
-        require(signature.length == 65);
-
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-
-        assembly {
-            // first 32 bytes, after the length prefix
-            r := mload(add(signature, 32))
-            // second 32 bytes
-            s := mload(add(signature, 64))
-            // final byte (first byte of the next 32 bytes)
-            v := byte(0, mload(add(signature, 96)))
-        }
-
-        return ecrecover(message, v, r, s);
     }
 
     function mudPrice() public view returns (uint256) {
@@ -292,22 +280,18 @@ contract Delaney is Pausable, Ownable {
         bytes memory signature,
         uint deadline
     ) public whenNotPaused {
-        uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
-        // TODO
-        address signer = recoverSignerFromSignature(
-            bytes32(uint256(140714483853992465185976883)),
-            signature
-        );
 
-        require(
-            signer == signerAddress,
-            "Administrator signature is required for claim"
-        );
+        string memory packedData = string(abi.encodePacked(msg.sender,usdt,minMud,rewardIds,deadline));
+        bool verify =  verifySign(signerAddress, packedData,signature);
+        require(verify, "Administrator signature is required for claim");
+
         require(
             block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
+
+        uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
         require(
             mud >= minMud,
             "Claim mud does not meet your minimum requirement"
@@ -318,8 +302,18 @@ contract Delaney is Pausable, Ownable {
         require(balance >= mud, "Insufficient balance in the contract");
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
+        
+        Claimant memory claimant;
+        claimant.id = totalClaim;
+        claimant.delegator = msg.sender;
+        claimant.minMud = minMud;
+        claimant.usdt = usdt;
+        claimant.deadline = deadline;
+        claimants[totalClaim] = claimant;
 
-        emit Claim(msg.sender, usdt, mud, rewardIds);
+        totalClaim += 1;
+
+        emit Claim(msg.sender, claimant.id, mud, usdt, rewardIds);
     }
 
     // 结束质押
@@ -389,5 +383,40 @@ contract Delaney is Pausable, Ownable {
 
     function unpause() public onlyOwner {
         _unpause();
+    }
+
+    // 验证签名
+    // 管理员进行对原始数据签名，通过此方法验证是否为管理员签名
+    function verifySign(
+        address signer,
+        string memory data,     
+        bytes memory signature
+    ) internal pure returns (bool) {
+        bytes32 messageHash = keccak256(abi.encodePacked(data));
+
+        bytes32 ethSignedMessageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n", messageHash)
+        );
+        //function to get the public address of the signer
+        (bytes32 r, bytes32 s, uint8 v) = splitSign(signature);
+        address recoveredSigner = ecrecover(ethSignedMessageHash, v, r, s);
+
+        return (recoveredSigner == signer);
+    }
+
+    function splitSign(
+        bytes memory sig
+    ) private pure returns (bytes32 r, bytes32 s, uint8 v) {
+        require(sig.length == 65, "Invalid signature length");
+
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := and(mload(add(sig, 96)), 0xff) 
+        }
+
+        if (v < 27) {
+            v +=27;
+        }
     }
 }
