@@ -280,9 +280,10 @@ contract Delaney is Pausable, Ownable {
         bytes memory signature,
         uint deadline
     ) public whenNotPaused {
-
-        string memory packedData = string(abi.encodePacked(msg.sender,usdt,minMud,rewardIds,deadline));
-        bool verify =  verifySign(signerAddress, packedData,signature);
+        string memory packedData = string(
+            abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
+        );
+        bool verify = verifySign(signerAddress, packedData, signature);
         require(verify, "Administrator signature is required for claim");
 
         require(
@@ -302,7 +303,7 @@ contract Delaney is Pausable, Ownable {
         require(balance >= mud, "Insufficient balance in the contract");
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
-        
+
         Claimant memory claimant;
         claimant.id = totalClaim;
         claimant.delegator = msg.sender;
@@ -389,7 +390,7 @@ contract Delaney is Pausable, Ownable {
     // 管理员进行对原始数据签名，通过此方法验证是否为管理员签名
     function verifySign(
         address signer,
-        string memory data,     
+        string memory data,
         bytes memory signature
     ) internal pure returns (bool) {
         bytes32 messageHash = keccak256(abi.encodePacked(data));
@@ -412,11 +413,11 @@ contract Delaney is Pausable, Ownable {
         assembly {
             r := mload(add(sig, 32))
             s := mload(add(sig, 64))
-            v := and(mload(add(sig, 96)), 0xff) 
+            v := and(mload(add(sig, 96)), 0xff)
         }
 
         if (v < 27) {
-            v +=27;
+            v += 27;
         }
     }
 }
