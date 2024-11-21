@@ -330,6 +330,7 @@ contract Delaney is Pausable, Ownable {
         Delegation memory delegation = delegations[id];
         uint mud = delegation.usdt / mudPrice();
 
+        require(!delegation.withdrew, "You have withdrew");
         require(deadline >= block.timestamp, "Undelegate expired");
         require(
             block.timestamp > delegation.unlockTime,
@@ -346,6 +347,8 @@ contract Delaney is Pausable, Ownable {
         require(balance >= mud, "Insufficient balance in the contract");
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
+
+        delegations[id].withdrew = true;
 
         emit Undelegate(msg.sender, id, delegation.usdt, mud);
     }
