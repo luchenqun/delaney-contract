@@ -162,7 +162,7 @@ contract Delaney is Pausable, Ownable {
         string rewardIds
     );
 
-    event Withdraw(
+    event Undelegate(
         address indexed delegator,
         uint256 id,
         uint256 usdt,
@@ -322,7 +322,7 @@ contract Delaney is Pausable, Ownable {
     }
 
     // 结束质押
-    function withdraw(
+    function undelegate(
         uint id,
         uint minMud,
         uint deadline
@@ -330,15 +330,15 @@ contract Delaney is Pausable, Ownable {
         Delegation memory delegation = delegations[id];
         uint mud = delegation.usdt / mudPrice();
 
-        require(deadline >= block.timestamp, "Withdraw expired");
+        require(deadline >= block.timestamp, "Undelegate expired");
         require(
             block.timestamp > delegation.unlockTime,
-            "You can't withdraw yet"
+            "You can't undelegate yet"
         );
         require(delegation.delegator == msg.sender, "You aren't the delegator");
         require(
             mud >= minMud,
-            "Withdraw mud does not meet your minimum requirement"
+            "Undelegate mud does not meet your minimum requirement"
         );
 
         IERC20 mudToken = IERC20(mudAddress);
@@ -347,7 +347,7 @@ contract Delaney is Pausable, Ownable {
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
 
-        emit Withdraw(msg.sender, id, delegation.usdt, mud);
+        emit Undelegate(msg.sender, id, delegation.usdt, mud);
     }
 
     // 存储
