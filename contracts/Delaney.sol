@@ -178,6 +178,7 @@ contract Delaney is Pausable, Ownable {
         address delegator;
         uint mud; // 每次质押数量
         uint usdt; // 数量对应usdt的价值
+        uint back_mud; // 取消质押返回对应的mud
         uint periodDuration;
         uint periodNum;
         uint unlockTime; // 解锁时间
@@ -349,6 +350,7 @@ contract Delaney is Pausable, Ownable {
         require(success, "Token transfer failed");
 
         delegations[id].withdrew = true;
+        delegations[id].back_mud = balance;
 
         emit Undelegate(msg.sender, id, delegation.usdt, mud);
     }
