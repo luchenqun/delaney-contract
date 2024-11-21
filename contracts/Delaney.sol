@@ -377,6 +377,10 @@ contract Delaney is Pausable, Ownable {
         emit Profit(msg.sender, mud);
     }
 
+    function setPeriodDuration(uint _periodDuration) public onlyOwner {
+        periodDuration = _periodDuration;
+    }
+
     function pause() public onlyOwner {
         _pause();
     }
