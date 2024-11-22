@@ -194,6 +194,20 @@ contract Delaney is Pausable, Ownable {
         uint deadline;
     }
 
+    struct Stat {
+        uint delegateCount;
+        uint delegateUsdt;
+        uint delegateMud;
+        uint claimCount;
+        uint claimUsdt;
+        uint claimMud;
+        uint undelegateCount;
+        uint undelegateUsdt;
+        uint undelegateMud;
+        uint depositMud;
+        uint profitMud;
+    }
+
     address public poolAddress;
     address public mudAddress;
     address public signerAddress;
@@ -201,12 +215,12 @@ contract Delaney is Pausable, Ownable {
     uint public periodNum = 8;
     uint public minPersonInvestUsdt = 100000000; // 100usdt
     uint public fee = 1; // 1%的手续费
-    uint public totalDelegate = 0; //
-    uint public totalClaim = 0;
 
     mapping(uint => Delegation) public delegations;
     mapping(address => uint) lastClaimTimestamp;
     mapping(uint => Claimant) public claimants;
+    mapping(uint => uint) public undelegateIds;
+    Stat public stat;
 
     constructor(
         address initialOwner,
@@ -256,7 +270,7 @@ contract Delaney is Pausable, Ownable {
 
         Delegation memory delegation;
         uint unlockTime = block.timestamp + periodDuration * periodNum;
-        delegation.id = totalDelegate;
+        delegation.id = stat.delegateCount;
         delegation.delegator = msg.sender;
         delegation.mud = mud;
         delegation.usdt = usdt;
@@ -264,9 +278,11 @@ contract Delaney is Pausable, Ownable {
         delegation.periodDuration = periodDuration;
         delegation.periodNum = periodNum;
         delegation.withdrew = false;
-        delegations[totalDelegate] = delegation;
+        delegations[stat.delegateCount] = delegation;
 
-        totalDelegate += 1;
+        stat.delegateCount += 1;
+        stat.delegateMud += mud;
+        stat.delegateUsdt += usdt;
 
         emit Delegate(msg.sender, delegation.id, mud, usdt, unlockTime);
     }
@@ -305,14 +321,16 @@ contract Delaney is Pausable, Ownable {
         require(success, "Token transfer failed");
 
         Claimant memory claimant;
-        claimant.id = totalClaim;
+        claimant.id = stat.claimCount;
         claimant.delegator = msg.sender;
         claimant.minMud = minMud;
         claimant.usdt = usdt;
         claimant.deadline = deadline;
-        claimants[totalClaim] = claimant;
+        claimants[stat.claimCount] = claimant;
 
-        totalClaim += 1;
+        stat.claimCount += 1;
+        stat.claimMud += mud;
+        stat.claimUsdt += usdt;
 
         emit Claim(msg.sender, claimant.id, mud, usdt, rewardIds);
     }
@@ -347,6 +365,11 @@ contract Delaney is Pausable, Ownable {
         delegations[id].withdrew = true;
         delegations[id].back_mud = balance;
 
+        undelegateIds[stat.undelegateCount] = id;
+        stat.undelegateCount += 1;
+        stat.undelegateMud += mud;
+        stat.undelegateUsdt += delegation.usdt;
+
         emit Undelegate(msg.sender, id, delegation.usdt, mud);
     }
 
@@ -359,6 +382,8 @@ contract Delaney is Pausable, Ownable {
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
 
+        stat.depositMud += mud;
+
         emit Deposit(msg.sender, mud);
     }
 
@@ -370,6 +395,8 @@ contract Delaney is Pausable, Ownable {
         require(balance >= mud, "Insufficient balance in the contract");
         bool success = mudToken.transfer(msg.sender, mud);
         require(success, "Token transfer failed");
+
+        stat.profitMud += mud;
 
         emit Profit(msg.sender, mud);
     }
