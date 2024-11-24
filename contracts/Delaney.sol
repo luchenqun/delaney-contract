@@ -220,6 +220,7 @@ contract Delaney is Pausable, Ownable {
     mapping(address => uint) lastClaimTimestamp;
     mapping(uint => Claimant) public claimants;
     mapping(uint => uint) public undelegateIds;
+    mapping(string => bool) public signatures;
     Stat public stat;
 
     constructor(
@@ -299,6 +300,7 @@ contract Delaney is Pausable, Ownable {
         string memory packedData = string(
             abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
         );
+        string memory signatureStr = string(abi.encodePacked(signature));
         bool verify = verifySign(signerAddress, packedData, signature);
         require(verify, "Administrator signature is required for claim");
 
@@ -307,6 +309,7 @@ contract Delaney is Pausable, Ownable {
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
+        require(!signatures[signatureStr], "You have claimed");
 
         uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
         require(
@@ -327,6 +330,8 @@ contract Delaney is Pausable, Ownable {
         claimant.usdt = usdt;
         claimant.deadline = deadline;
         claimants[stat.claimCount] = claimant;
+
+        signatures[string(abi.encodePacked(signature))] = true;
 
         stat.claimCount += 1;
         stat.claimMud += mud;
