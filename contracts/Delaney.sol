@@ -160,7 +160,7 @@ contract Delaney is Pausable, Ownable {
         uint256 id,
         uint256 usdt,
         uint256 mud,
-        string rewardIds
+        string signature
     );
 
     event Undelegate(
@@ -179,7 +179,7 @@ contract Delaney is Pausable, Ownable {
         address delegator;
         uint mud; // 每次质押数量
         uint usdt; // 数量对应usdt的价值
-        uint back_mud; // 取消质押返回对应的mud
+        uint backMud; // 取消质押返回对应的mud
         uint periodDuration;
         uint periodNum;
         uint unlockTime; // 解锁时间
@@ -294,14 +294,13 @@ contract Delaney is Pausable, Ownable {
         uint usdt,
         uint minMud,
         string memory rewardIds,
-        bytes memory signature,
+        string memory signature,
         uint deadline
     ) public whenNotPaused {
         string memory packedData = string(
             abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
         );
-        string memory signatureStr = string(abi.encodePacked(signature));
-        bool verify = verifySign(signerAddress, packedData, signature);
+        bool verify = verifySign(signerAddress, packedData, bytes(signature));
         require(verify, "Administrator signature is required for claim");
 
         require(
@@ -309,7 +308,7 @@ contract Delaney is Pausable, Ownable {
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
-        require(!signatures[signatureStr], "You have claimed");
+        require(!signatures[signature], "You have claimed");
 
         uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
         require(
@@ -331,13 +330,13 @@ contract Delaney is Pausable, Ownable {
         claimant.deadline = deadline;
         claimants[stat.claimCount] = claimant;
 
-        signatures[string(abi.encodePacked(signature))] = true;
+        signatures[signature] = true;
 
         stat.claimCount += 1;
         stat.claimMud += mud;
         stat.claimUsdt += usdt;
 
-        emit Claim(msg.sender, claimant.id, mud, usdt, rewardIds);
+        emit Claim(msg.sender, claimant.id, mud, usdt, signature);
     }
 
     // 结束质押
@@ -368,7 +367,7 @@ contract Delaney is Pausable, Ownable {
         require(success, "Token transfer failed");
 
         delegations[id].withdrew = true;
-        delegations[id].back_mud = balance;
+        delegations[id].backMud = balance;
 
         undelegateIds[stat.undelegateCount] = id;
         stat.undelegateCount += 1;
