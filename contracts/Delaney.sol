@@ -191,6 +191,7 @@ contract Delaney is Pausable, Ownable {
         address delegator;
         uint minMud;
         uint usdt;
+        string rewardIds;
         uint deadline;
     }
 
@@ -294,27 +295,28 @@ contract Delaney is Pausable, Ownable {
         uint usdt,
         uint minMud,
         string memory rewardIds,
-        string memory signature,
+        bytes memory signature,
         uint deadline
     ) public whenNotPaused {
-        string memory packedData = string(
-            abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
-        );
-        bool verify = verifySign(signerAddress, packedData, bytes(signature));
-        require(verify, "Administrator signature is required for claim");
+        // string memory packedData = string(
+        //     abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
+        // );
+        // bool verify = verifySign(signerAddress, packedData, signature);
+        // require(verify, "Administrator signature is required for claim");
+        string memory sign = string(signature);
 
         require(
             block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
-        require(!signatures[signature], "You have claimed");
+        require(!signatures[sign], "You have claimed");
 
         uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
-        require(
-            mud >= minMud,
-            "Claim mud does not meet your minimum requirement"
-        );
+        // require(
+        //     mud >= minMud,
+        //     "Claim mud does not meet your minimum requirement"
+        // );
 
         IERC20 mudToken = IERC20(mudAddress);
         uint256 balance = mudToken.balanceOf(address(this));
@@ -327,16 +329,17 @@ contract Delaney is Pausable, Ownable {
         claimant.delegator = msg.sender;
         claimant.minMud = minMud;
         claimant.usdt = usdt;
+        claimant.rewardIds = rewardIds;
         claimant.deadline = deadline;
         claimants[stat.claimCount] = claimant;
 
-        signatures[signature] = true;
+        signatures[sign] = true;
 
         stat.claimCount += 1;
         stat.claimMud += mud;
         stat.claimUsdt += usdt;
 
-        emit Claim(msg.sender, claimant.id, mud, usdt, signature);
+        emit Claim(msg.sender, claimant.id, usdt, mud, sign);
     }
 
     // 结束质押
