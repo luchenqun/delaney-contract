@@ -323,7 +323,7 @@ contract Delaney is Pausable, Ownable {
         require(deadline >= block.timestamp, "Claim expired");
         require(!signatures[signature], "You have claimed");
 
-        uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
+        uint mud = (((usdt / mudPrice()) * (100 - fee)) / 100) * 1000000;
         require(
             mud >= minMud,
             "Claim mud does not meet your minimum requirement"
