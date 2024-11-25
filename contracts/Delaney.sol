@@ -370,7 +370,7 @@ contract Delaney is Pausable, Ownable {
         delegation.periodDuration = periodDuration;
         delegation.periodNum = periodNum;
 
-        emit Redelegate(msg.sender, id, delegation.usdt, delegation.usdt);
+        emit Redelegate(msg.sender, id, delegation.usdt, delegation.mud);
     }
 
     // 结束质押
