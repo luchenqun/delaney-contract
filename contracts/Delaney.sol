@@ -289,6 +289,7 @@ contract Delaney is Pausable, Ownable {
         delegation.periodDuration = periodDuration;
         delegation.periodNum = periodNum;
         delegation.withdrew = false;
+
         delegations[stat.delegateCount] = delegation;
 
         stat.delegateCount += 1;
@@ -353,7 +354,7 @@ contract Delaney is Pausable, Ownable {
 
     // 到期重复质押
     function redelegate(uint id, uint deadline) public whenNotPaused {
-        Delegation memory delegation = delegations[id];
+        Delegation storage delegation = delegations[id];
 
         require(delegation.delegator == msg.sender, "You aren't the delegator");
         require(!delegation.withdrew, "You have withdrew");
@@ -379,7 +380,7 @@ contract Delaney is Pausable, Ownable {
         uint minMud,
         uint deadline
     ) public whenNotPaused {
-        Delegation memory delegation = delegations[id];
+        Delegation storage delegation = delegations[id];
         require(delegation.delegator == msg.sender, "You aren't the delegator");
 
         uint mud = delegation.usdt / mudPrice();
