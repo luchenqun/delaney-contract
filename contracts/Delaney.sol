@@ -163,6 +163,13 @@ contract Delaney is Pausable, Ownable {
         string signature
     );
 
+    event Redelegate(
+        address indexed delegator,
+        uint256 id,
+        uint256 usdt,
+        uint256 mud
+    );
+
     event Undelegate(
         address indexed delegator,
         uint256 id,
@@ -208,6 +215,8 @@ contract Delaney is Pausable, Ownable {
         uint depositMud;
         uint profitMud;
     }
+
+    address constant ZeroAddress = address(0);
 
     address public poolAddress;
     address public mudAddress;
@@ -342,6 +351,28 @@ contract Delaney is Pausable, Ownable {
         emit Claim(msg.sender, claimant.id, usdt, mud, sign);
     }
 
+    // 到期重复质押
+    function redelegate(uint id, uint deadline) public whenNotPaused {
+        Delegation memory delegation = delegations[id];
+
+        require(delegation.delegator == msg.sender, "You aren't the delegator");
+        require(!delegation.withdrew, "You have withdrew");
+        require(deadline >= block.timestamp, "Redelegate expired");
+        require(
+            block.timestamp > delegation.unlockTime,
+            "You can't redelegate yet"
+        );
+
+        uint unlockTime = block.timestamp + periodDuration * periodNum;
+        delegation.id = stat.delegateCount;
+        delegation.delegator = msg.sender;
+        delegation.unlockTime = unlockTime;
+        delegation.periodDuration = periodDuration;
+        delegation.periodNum = periodNum;
+
+        emit Redelegate(msg.sender, id, delegation.usdt, delegation.usdt);
+    }
+
     // 结束质押
     function undelegate(
         uint id,
@@ -349,6 +380,8 @@ contract Delaney is Pausable, Ownable {
         uint deadline
     ) public whenNotPaused {
         Delegation memory delegation = delegations[id];
+        require(delegation.delegator == msg.sender, "You aren't the delegator");
+
         uint mud = delegation.usdt / mudPrice();
 
         require(!delegation.withdrew, "You have withdrew");
@@ -357,7 +390,6 @@ contract Delaney is Pausable, Ownable {
             block.timestamp > delegation.unlockTime,
             "You can't undelegate yet"
         );
-        require(delegation.delegator == msg.sender, "You aren't the delegator");
         require(
             mud >= minMud,
             "Undelegate mud does not meet your minimum requirement"
