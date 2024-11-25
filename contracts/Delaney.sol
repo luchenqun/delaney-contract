@@ -196,9 +196,11 @@ contract Delaney is Pausable, Ownable {
     struct Claimant {
         uint id;
         address delegator;
-        uint minMud;
         uint usdt;
+        uint minMud;
+        uint mud;
         string rewardIds;
+        string signature;
         uint deadline;
     }
 
@@ -322,10 +324,10 @@ contract Delaney is Pausable, Ownable {
         require(!signatures[signature], "You have claimed");
 
         uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
-        // require(
-        //     mud >= minMud,
-        //     "Claim mud does not meet your minimum requirement"
-        // );
+        require(
+            mud >= minMud,
+            "Claim mud does not meet your minimum requirement"
+        );
 
         IERC20 mudToken = IERC20(mudAddress);
         uint256 balance = mudToken.balanceOf(address(this));
@@ -336,10 +338,13 @@ contract Delaney is Pausable, Ownable {
         Claimant memory claimant;
         claimant.id = stat.claimCount;
         claimant.delegator = msg.sender;
-        claimant.minMud = minMud;
         claimant.usdt = usdt;
+        claimant.minMud = minMud;
+        claimant.mud = mud;
         claimant.rewardIds = rewardIds;
+        claimant.signature = signature;
         claimant.deadline = deadline;
+
         claimants[stat.claimCount] = claimant;
 
         signatures[signature] = true;
