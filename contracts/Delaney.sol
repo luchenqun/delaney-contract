@@ -445,6 +445,21 @@ contract Delaney is Pausable, Ownable {
         periodDuration = _periodDuration;
     }
 
+    function setPeriodNum(uint _periodNum) public onlyOwner {
+        periodNum = _periodNum;
+    }
+
+    function setMinPersonInvestUsdt(
+        uint _minPersonInvestUsdt
+    ) public onlyOwner {
+        minPersonInvestUsdt = _minPersonInvestUsdt;
+    }
+
+    function setFee(uint _fee) public onlyOwner {
+        require(_fee < 100, "Fee must less than 100");
+        fee = _fee;
+    }
+
     function pause() public onlyOwner {
         _pause();
     }
