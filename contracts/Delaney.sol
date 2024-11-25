@@ -300,27 +300,26 @@ contract Delaney is Pausable, Ownable {
     }
 
     // 领取奖励
-    // rewardIds 是用户去领取了哪些奖励id，比如 "{dynamic:[1,5,6], static:[1,8,9]}"
+    // rewardIds 是用户去领取了哪些奖励id，比如 "{dynamic_ids:[1,5,6], static_ids:[1,8,9]}"
     function claim(
         uint usdt,
         uint minMud,
         string memory rewardIds,
-        bytes memory signature,
+        string memory signature,
         uint deadline
     ) public whenNotPaused {
         // string memory packedData = string(
         //     abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
         // );
-        // bool verify = verifySign(signerAddress, packedData, signature);
+        // bool verify = verifySign(signerAddress, packedData, bytes(signature));
         // require(verify, "Administrator signature is required for claim");
-        string memory sign = string(signature);
 
         require(
             block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
-        require(!signatures[sign], "You have claimed");
+        require(!signatures[signature], "You have claimed");
 
         uint mud = ((usdt / mudPrice()) * (100 - fee)) / 100;
         // require(
@@ -343,13 +342,13 @@ contract Delaney is Pausable, Ownable {
         claimant.deadline = deadline;
         claimants[stat.claimCount] = claimant;
 
-        signatures[sign] = true;
+        signatures[signature] = true;
 
         stat.claimCount += 1;
         stat.claimMud += mud;
         stat.claimUsdt += usdt;
 
-        emit Claim(msg.sender, claimant.id, usdt, mud, sign);
+        emit Claim(msg.sender, claimant.id, usdt, mud, signature);
     }
 
     // 到期重复质押
