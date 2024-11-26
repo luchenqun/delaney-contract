@@ -305,21 +305,34 @@ contract Delaney is Pausable, Ownable {
         uint usdt,
         uint minMud,
         string memory rewardIds,
-        string memory signature,
+        bytes memory signature,
         uint deadline
     ) public whenNotPaused {
-        // string memory packedData = string(
-        //     abi.encodePacked(msg.sender, usdt, minMud, rewardIds, deadline)
-        // );
-        // bool verify = verifySign(signerAddress, packedData, bytes(signature));
-        // require(verify, "Administrator signature is required for claim");
+        bytes32 ethSignedMessageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                keccak256(
+                    abi.encodePacked(
+                        msg.sender,
+                        usdt,
+                        minMud,
+                        rewardIds,
+                        deadline
+                    )
+                )
+            )
+        );
+        address signer = recoverSigner(ethSignedMessageHash, signature);
+        require(signer == signerAddress, "Claim is required for signer");
+
+        string memory hexSignature = bytesToHexString(signature);
 
         require(
             block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
-        require(!signatures[signature], "You have claimed");
+        require(!signatures[hexSignature], "You have claimed");
 
         uint mud = (((usdt / mudPrice()) * (100 - fee)) / 100) * 1000000;
         require(
@@ -340,18 +353,18 @@ contract Delaney is Pausable, Ownable {
         claimant.minMud = minMud;
         claimant.mud = mud;
         claimant.rewardIds = rewardIds;
-        claimant.signature = signature;
+        claimant.signature = hexSignature;
         claimant.deadline = deadline;
 
         claimants[stat.claimCount] = claimant;
 
-        signatures[signature] = true;
+        signatures[hexSignature] = true;
 
         stat.claimCount += 1;
         stat.claimMud += mud;
         stat.claimUsdt += usdt;
 
-        emit Claim(msg.sender, claimant.id, usdt, mud, signature);
+        emit Claim(msg.sender, claimant.id, usdt, mud, hexSignature);
     }
 
     // 到期重复质押
@@ -470,38 +483,51 @@ contract Delaney is Pausable, Ownable {
         _unpause();
     }
 
-    // 验证签名
-    // 管理员进行对原始数据签名，通过此方法验证是否为管理员签名
-    function verifySign(
-        address signer,
-        string memory data,
+    function recoverSigner(
+        bytes32 ethSignedMessageHash,
         bytes memory signature
-    ) internal pure returns (bool) {
-        bytes32 messageHash = keccak256(abi.encodePacked(data));
+    ) public pure returns (address) {
+        (bytes32 r, bytes32 s, uint8 v) = splitSignature(signature);
 
-        bytes32 ethSignedMessageHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n", messageHash)
-        );
-        //function to get the public address of the signer
-        (bytes32 r, bytes32 s, uint8 v) = splitSign(signature);
-        address recoveredSigner = ecrecover(ethSignedMessageHash, v, r, s);
-
-        return (recoveredSigner == signer);
+        return ecrecover(ethSignedMessageHash, v, r, s);
     }
 
-    function splitSign(
+    function splitSignature(
         bytes memory sig
-    ) private pure returns (bytes32 r, bytes32 s, uint8 v) {
-        require(sig.length == 65, "Invalid signature length");
+    ) public pure returns (bytes32 r, bytes32 s, uint8 v) {
+        // 检查签名长度，65是标准r,s,v签名的长度
+        require(sig.length == 65, "invalid signature length");
 
         assembly {
-            r := mload(add(sig, 32))
-            s := mload(add(sig, 64))
-            v := and(mload(add(sig, 96)), 0xff)
+            // first 32 bytes, after the length prefix
+            r := mload(add(sig, 0x20))
+            // second 32 bytes
+            s := mload(add(sig, 0x40))
+            // final byte (first byte of the next 32 bytes)
+            v := byte(0, mload(add(sig, 0x60)))
+        }
+    }
+
+    function bytesToHexString(
+        bytes memory data
+    ) public pure returns (string memory) {
+        bytes memory hexString = new bytes(2 * data.length + 2);
+        hexString[0] = "0";
+        hexString[1] = "x";
+        for (uint256 i = 0; i < data.length; i++) {
+            uint8 b = uint8(data[i]);
+            hexString[2 * i + 2] = _byteToHex(b / 16);
+            hexString[2 * i + 3] = _byteToHex(b % 16);
         }
 
-        if (v < 27) {
-            v += 27;
+        return string(hexString);
+    }
+
+    function _byteToHex(uint8 b) private pure returns (bytes1) {
+        if (b < 10) {
+            return bytes1(uint8(b + 48));
+        } else {
+            return bytes1(uint8(b + 87));
         }
     }
 }
