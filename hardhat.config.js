@@ -15,6 +15,14 @@ module.exports = {
         { privateKey: '39cfe0662cdede90094bf079b339e09e316b1cfe02e92d56a4d6d95586378e38', balance: '100000000000000000000000' },
         { privateKey: 'a78e6fe4fe2c66a594fdd639b39bd0064d7cefbbebf43b57de153392b0f4e30c', balance: '100000000000000000000000' },
       ],
+      mining: {
+        auto: true,
+        // Produce new block every 3 minutes to resolve next issues
+        // https://github.com/NomicFoundation/hardhat/issues/2053
+        // https://github.com/ethers-io/ethers.js/issues/2338
+        // https://github.com/ethers-io/ethers.js/discussions/4116
+        interval: 3 * 60 * 1000, // should be less then 5 minutes to make event subscription work
+      },
     },
   },
 };

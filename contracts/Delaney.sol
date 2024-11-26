@@ -218,8 +218,6 @@ contract Delaney is Pausable, Ownable {
         uint profitMud;
     }
 
-    address constant ZeroAddress = address(0);
-
     address public poolAddress;
     address public mudAddress;
     address public signerAddress;
@@ -387,7 +385,7 @@ contract Delaney is Pausable, Ownable {
         Delegation storage delegation = delegations[id];
         require(delegation.delegator == msg.sender, "You aren't the delegator");
 
-        uint mud = delegation.usdt / mudPrice();
+        uint mud = (delegation.usdt / mudPrice()) * 1000000;
 
         require(!delegation.withdrew, "You have withdrew");
         require(deadline >= block.timestamp, "Undelegate expired");
@@ -407,7 +405,7 @@ contract Delaney is Pausable, Ownable {
         require(success, "Token transfer failed");
 
         delegations[id].withdrew = true;
-        delegations[id].backMud = balance;
+        delegations[id].backMud = mud;
 
         undelegateIds[stat.undelegateCount] = id;
         stat.undelegateCount += 1;
