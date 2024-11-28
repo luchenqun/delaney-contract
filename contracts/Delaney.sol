@@ -221,16 +221,13 @@ contract Delaney is Pausable, Ownable {
     address public poolAddress;
     address public mudAddress;
     address public signerAddress;
-    uint public periodDuration = 15 * 24 * 3600; // 15 day
-    uint public periodNum = 8;
-    uint public minPersonInvestUsdt = 100000000; // 100usdt
-    uint public fee = 1; // 1%的手续费
 
     mapping(uint => Delegation) public delegations;
     mapping(address => uint) lastClaimTimestamp;
     mapping(uint => Claimant) public claimants;
     mapping(uint => uint) public undelegateIds;
     mapping(string => bool) public signatures;
+    mapping(string => uint) configs;
     Stat public stat;
 
     constructor(
@@ -242,6 +239,23 @@ contract Delaney is Pausable, Ownable {
         signerAddress = initalSignerAddress;
         poolAddress = initalPoolAddress;
         mudAddress = initalMudAddress;
+        configs["period_duration"] = 15 * 24 * 3600;
+        configs["period_num"] = 8;
+        configs["period_reward_ratio"] = 5;
+        configs["person_reward_level1"] = 3;
+        configs["person_reward_level2"] = 4;
+        configs["person_reward_level3"] = 5;
+        configs["person_reward_level4"] = 6;
+        configs["person_reward_level5"] = 7;
+        configs["team_reward_level1"] = 3;
+        configs["team_reward_level2"] = 6;
+        configs["team_reward_level3"] = 9;
+        configs["team_reward_level4"] = 12;
+        configs["team_reward_level5"] = 15;
+        configs["preson_invest_min_usdt"] = 100 * 1000000;
+        configs["preson_reward_min_usdt"] = 100 * 1000000;
+        configs["team_reward_min_usdt"] = 1000 * 1000000;
+        configs["fee"] = 1;
     }
 
     function mudPrice() public view returns (uint256) {
@@ -271,13 +285,16 @@ contract Delaney is Pausable, Ownable {
             "Delegate mud corresponding usdt does not meet your minimum requirement"
         );
         require(
-            usdt >= minPersonInvestUsdt,
+            usdt >= configs["preson_invest_min_usdt"],
             "Delegate mud corresponding usdt does not meet system minimum requirement"
         );
 
         IERC20 mudToken = IERC20(mudAddress);
         bool success = mudToken.transferFrom(msg.sender, address(this), mud);
         require(success, "Token transfer failed");
+
+        uint periodDuration = configs["period_duration"];
+        uint periodNum = configs["period_num"];
 
         Delegation memory delegation;
         uint unlockTime = block.timestamp + periodDuration * periodNum;
@@ -334,7 +351,8 @@ contract Delaney is Pausable, Ownable {
         require(deadline >= block.timestamp, "Claim expired");
         require(!signatures[hexSignature], "You have claimed");
 
-        uint mud = (((usdt / mudPrice()) * (100 - fee)) / 100) * 1000000;
+        uint mud = (((usdt / mudPrice()) * (100 - configs["fee"])) / 100) *
+            1000000;
         require(
             mud >= minMud,
             "Claim mud does not meet your minimum requirement"
@@ -378,6 +396,9 @@ contract Delaney is Pausable, Ownable {
             block.timestamp > delegation.unlockTime,
             "You can't redelegate yet"
         );
+
+        uint periodDuration = configs["period_duration"];
+        uint periodNum = configs["period_num"];
 
         uint unlockTime = block.timestamp + periodDuration * periodNum;
         delegation.id = stat.delegateCount;
@@ -456,23 +477,38 @@ contract Delaney is Pausable, Ownable {
         emit Profit(msg.sender, mud);
     }
 
-    function setPeriodDuration(uint _periodDuration) public onlyOwner {
-        periodDuration = _periodDuration;
+    function setConfig(string memory key, uint value) public onlyOwner {
+        if (compareString(key, "period_num")) {
+            require(value > 0, "Period duration must granter than 0");
+        }
+        if (compareString(key, "fee")) {
+            require(value < 100, "Fee must less than 100");
+        }
+
+        configs[key] = value;
     }
 
-    function setPeriodNum(uint _periodNum) public onlyOwner {
-        periodNum = _periodNum;
-    }
+    function getConfigs() public view returns (uint[] memory) {
+        uint[] memory values = new uint[](17);
+        values[0] = configs["period_duration"];
+        values[1] = configs["period_num"];
+        values[2] = configs["period_reward_ratio"];
+        values[3] = configs["person_reward_level1"];
+        values[4] = configs["person_reward_level2"];
+        values[5] = configs["person_reward_level3"];
+        values[6] = configs["person_reward_level4"];
+        values[7] = configs["person_reward_level5"];
+        values[8] = configs["team_reward_level1"];
+        values[9] = configs["team_reward_level2"];
+        values[10] = configs["team_reward_level3"];
+        values[11] = configs["team_reward_level4"];
+        values[12] = configs["team_reward_level5"];
+        values[13] = configs["preson_invest_min_usdt"];
+        values[14] = configs["preson_reward_min_usdt"];
+        values[15] = configs["team_reward_min_usdt"];
+        values[16] = configs["fee"];
 
-    function setMinPersonInvestUsdt(
-        uint _minPersonInvestUsdt
-    ) public onlyOwner {
-        minPersonInvestUsdt = _minPersonInvestUsdt;
-    }
-
-    function setFee(uint _fee) public onlyOwner {
-        require(_fee < 100, "Fee must less than 100");
-        fee = _fee;
+        return values;
     }
 
     function pause() public onlyOwner {
@@ -529,5 +565,12 @@ contract Delaney is Pausable, Ownable {
         } else {
             return bytes1(uint8(b + 87));
         }
+    }
+
+    function compareString(
+        string memory a,
+        string memory b
+    ) public pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }
