@@ -59,10 +59,7 @@ describe("Delaney", function () {
   });
 
   describe("delegate", function () {
-    let mudPrice; // 假设 mudToken 的价格
-    const minPersonInvestUsdt = 10; // 系统最低要求的 USDT
-    const periodDuration = 3600; // 假设每个周期为 1 小时
-    const periodNum = 2; // 假设重新质押 2 个周期
+    let mudPrice;
 
     beforeEach(async function () {
       mudPrice = await delaney.mudPrice();
@@ -70,8 +67,8 @@ describe("Delaney", function () {
     });
 
     it("should successfully delegate", async function () {
-      const minUsdt = 1; // 最小 USDT 要求
-      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1小时后过期
+      const minUsdt = 1;
+      const deadline = Math.floor(Date.now() / 1000) + 3600;
       const expectUsdt = (mudAmount * Number(mudPrice)) / 1000000;
 
       // 调用 delegate 方法
@@ -100,7 +97,7 @@ describe("Delaney", function () {
 
     it("should revert if delegate is expired", async function () {
       const minUsdt = 1;
-      const deadline = Math.floor(Date.now() / 1000) - 3600; // 过期时间
+      const deadline = Math.floor(Date.now() / 1000) - 3600;
 
       await expect(
         delaney.connect(user1).delegate(mudAmount, minUsdt, deadline)
@@ -133,11 +130,11 @@ describe("Delaney", function () {
   });
 
   describe("claim", function () {
-    const usdtAmount = ethers.parseUnits("100", 18); // 假设每次 claim 的 USDT 数量
+    const usdtAmount = ethers.parseUnits("100", 18);
 
     it("should successfully claim rewards", async function () {
       const minMud = 1;
-      const deadline = Math.floor(Date.now() / 1000) + 3600; // 1小时后过期
+      const deadline = Math.floor(Date.now() / 1000) + 3600;
       const rewardIds = "{}";
 
       const messageHash = ethers.solidityPackedKeccak256(
@@ -189,7 +186,7 @@ describe("Delaney", function () {
 
     it("should revert if claim is expired", async function () {
       const minMud = 1;
-      const deadline = Math.floor(Date.now() / 1000) - 3600; // 过期时间
+      const deadline = Math.floor(Date.now() / 1000) - 3600;
       const rewardIds = "reward1";
 
       const messageHash = ethers.solidityPackedKeccak256(
@@ -218,12 +215,10 @@ describe("Delaney", function () {
 
       const signature = await owner.signMessage(ethers.getBytes(messageHash));
 
-      // 首次调用成功
       await delaney
         .connect(user1)
         .claim(usdtAmount, minMud, rewardIds, signature, deadline);
 
-      // 尝试在24小时内再次调用
       await expect(
         delaney
           .connect(user1)
@@ -290,7 +285,7 @@ describe("Delaney", function () {
 
   describe("undelegate", function () {
     const minUsdt = 1;
-    const deadline = Math.floor(Date.now() / 1000) + 3600; // 设置截止时间为5分钟后
+    const deadline = Math.floor(Date.now() / 1000) + 3600;
 
     beforeEach(async function () {
       // 设置用户的委托
@@ -310,7 +305,7 @@ describe("Delaney", function () {
     it("should revert if undelegate is expired", async function () {
       const id = 0;
       const minMud = 1;
-      const deadline = Math.floor(Date.now() / 1000) - 3600; // 过期的截止时间
+      const deadline = Math.floor(Date.now() / 1000) - 3600;
 
       await expect(
         delaney.connect(user1).undelegate(id, minMud, deadline)
@@ -329,19 +324,16 @@ describe("Delaney", function () {
         .to.emit(delaney, "Deposit")
         .withArgs(user1.address, depositAmount);
 
-      // 检查用户余额
       const userBalance = await mudToken.balanceOf(user1.address);
       expect(userBalance).to.equal(depositAmount + balance);
 
-      // 检查合约的 depositMud 状态
       const stat = await delaney.stat();
       expect(stat.depositMud).to.equal(depositAmount);
     });
 
     it("should revert if contract has insufficient balance", async function () {
-      const depositAmount = ethers.parseUnits("60000", 18); // 超过合约余额
+      const depositAmount = ethers.parseUnits("60000", 18);
 
-      // 尝试调用 deposit 函数并检查是否抛出错误
       await expect(
         delaney.connect(user1).deposit(depositAmount)
       ).to.be.revertedWith("Insufficient balance in the contract");
@@ -354,10 +346,8 @@ describe("Delaney", function () {
     });
     it("should allow the owner to profit successfully", async function () {
       const mudAmount = 1000;
-
       await delaney.unpause();
 
-      // 记录合约中存款的初始值
       const beforeStat = await delaney.stat();
       initialProfitMud = beforeStat.profitMud;
       const balance = await mudToken.balanceOf(delaney.target);
@@ -374,22 +364,19 @@ describe("Delaney", function () {
         initialProfitMud + BigInt(mudAmount)
       );
 
-      // 验证事件是否被正确发出
       await expect(tx)
         .to.emit(delaney, "Profit")
         .withArgs(owner.address, mudAmount);
     });
 
     it("should revert if the contract has insufficient balance", async function () {
-      const mudAmount = ethers.parseUnits("100000", 18); // 用户要提取的 MUD 数量
+      const mudAmount = ethers.parseUnits("100000", 18);
 
-      // 确保合约未暂停
-      await delaney.unpause(); // 如果合约是暂停的，先调用 unpause
+      await delaney.unpause();
 
-      // 调用 profit 方法，合约中没有足够的 MUD 代币
       await expect(delaney.connect(owner).profit(mudAmount)).to.be.revertedWith(
         "Insufficient balance in the contract"
-      ); // 验证是否会 revert
+      );
     });
   });
 
@@ -398,27 +385,21 @@ describe("Delaney", function () {
       await delaney.pause();
     });
     it("should allow the owner to pause the contract", async function () {
-      // 确保合约未暂停
-      await delaney.unpause(); // 确保合约处于正常状态
+      await delaney.unpause();
 
-      // 调用 pause 方法
       await delaney.connect(owner).pause();
 
-      // 验证合约是否被暂停
-      expect(await delaney.paused()).to.be.true; // 假设合约有 paused() 方法
+      expect(await delaney.paused()).to.be.true;
     });
   });
 
   describe("unpause", function () {
     it("should allow the owner to unpause the contract", async function () {
-      // 首先暂停合约
       await delaney.connect(owner).pause();
 
-      // 调用 unpause 方法
       await delaney.connect(owner).unpause();
 
-      // 验证合约是否恢复
-      expect(await delaney.paused()).to.be.false; // 假设合约有 paused() 方法
+      expect(await delaney.paused()).to.be.false;
     });
   });
 });
