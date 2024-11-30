@@ -223,11 +223,11 @@ contract Delaney is Pausable, Ownable {
     address public signerAddress;
 
     mapping(uint => Delegation) public delegations;
-    mapping(address => uint) lastClaimTimestamp;
+    mapping(address => uint) public lastClaimTimestamp;
     mapping(uint => Claimant) public claimants;
     mapping(uint => uint) public undelegateIds;
     mapping(string => bool) public signatures;
-    mapping(string => uint) configs;
+    mapping(string => uint) public configs;
     Stat public stat;
 
     constructor(
@@ -256,6 +256,7 @@ contract Delaney is Pausable, Ownable {
         configs["preson_reward_min_usdt"] = 100 * 1000000;
         configs["team_reward_min_usdt"] = 1000 * 1000000;
         configs["fee"] = 1;
+        configs["claim_min_usdt"] = 1 * 1000000;
     }
 
     function mudPrice() public view returns (uint256) {
@@ -344,6 +345,10 @@ contract Delaney is Pausable, Ownable {
 
         string memory hexSignature = bytesToHexString(signature);
 
+        require(
+            usdt >= configs["claim_min_usdt"],
+            "The amount of claim does not meet the minimum amount"
+        );
         require(
             block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
             "You can claim only once per day"
@@ -489,7 +494,7 @@ contract Delaney is Pausable, Ownable {
     }
 
     function getConfigs() public view returns (uint[] memory) {
-        uint[] memory values = new uint[](17);
+        uint[] memory values = new uint[](18);
         values[0] = configs["period_duration"];
         values[1] = configs["period_num"];
         values[2] = configs["period_reward_ratio"];
@@ -507,6 +512,7 @@ contract Delaney is Pausable, Ownable {
         values[14] = configs["preson_reward_min_usdt"];
         values[15] = configs["team_reward_min_usdt"];
         values[16] = configs["fee"];
+        values[17] = configs["claim_min_usdt"];
 
         return values;
     }
