@@ -255,8 +255,8 @@ contract Delaney is Pausable, Ownable {
         configs["preson_invest_min_usdt"] = 100 * 1000000;
         configs["preson_reward_min_usdt"] = 100 * 1000000;
         configs["team_reward_min_usdt"] = 1000 * 1000000;
-        configs["fee"] = 1;
-        configs["claim_min_usdt"] = 1 * 1000000;
+        configs["fee"] = 0;
+        configs["claim_min_usdt"] = 50 * 1000000;
     }
 
     function mudPrice() public view returns (uint256) {

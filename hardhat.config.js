@@ -1,4 +1,5 @@
 require('@nomicfoundation/hardhat-toolbox');
+require('@nomicfoundation/hardhat-verify');
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -24,5 +25,27 @@ module.exports = {
         interval: 3 * 60 * 1000, // should be less then 5 minutes to make event subscription work
       },
     },
+    mud: {
+      url: 'https://testnet-rpc.mud-chain.net',
+      accounts: ['f78a036930ce63791ea6ea20072986d8c3f16a6811f6a2583b0787c45086f769'],
+    },
+  },
+  etherscan: {
+    apiKey: {
+      mud: 'It seems like you can write whatever you want',
+    },
+    customChains: [
+      {
+        network: 'mud',
+        chainId: 168169,
+        urls: {
+          apiURL: 'https://testnet-scan.mud-chain.net/api',
+          browserURL: 'https://testnet-scan.mud-chain.net/',
+        },
+      },
+    ],
+  },
+  sourcify: {
+    enabled: false,
   },
 };
