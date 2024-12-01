@@ -177,6 +177,8 @@ contract Delaney is Pausable, Ownable {
         uint256 mud
     );
 
+    event SetConfig(address indexed owner, string key, uint256 value);
+
     event Deposit(address indexed Depositer, uint256 mud);
 
     event Profit(address indexed owner, uint256 mud);
@@ -491,6 +493,8 @@ contract Delaney is Pausable, Ownable {
         }
 
         configs[key] = value;
+
+        emit SetConfig(msg.sender, key, value);
     }
 
     function getConfigs() public view returns (uint[] memory) {

@@ -17,7 +17,7 @@ async function main() {
 
   {
     let tx;
-    tx = await delaney.setConfig('period_duration', 180); // 方便测试每个周期设为180秒
+    tx = await delaney.setConfig('period_duration', 30); // 方便测试每个周期设为30秒
     await tx.wait();
 
     tx = await delaney.setConfig('period_num', 3); // 方便测试一共3周期
