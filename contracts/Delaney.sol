@@ -259,6 +259,8 @@ contract Delaney is Pausable, Ownable {
         configs["team_reward_min_usdt"] = 1000 * 1000000;
         configs["fee"] = 0;
         configs["claim_min_usdt"] = 50 * 1000000;
+        configs["team_level1_sub_usdt"] = 5000 * 1000000;
+        configs["team_level1_team_usdt"] = 20000 * 1000000;
     }
 
     function mudPrice() public view returns (uint256) {
@@ -498,7 +500,7 @@ contract Delaney is Pausable, Ownable {
     }
 
     function getConfigs() public view returns (uint[] memory) {
-        uint[] memory values = new uint[](18);
+        uint[] memory values = new uint[](20);
         values[0] = configs["period_duration"];
         values[1] = configs["period_num"];
         values[2] = configs["period_reward_ratio"];
@@ -517,6 +519,8 @@ contract Delaney is Pausable, Ownable {
         values[15] = configs["team_reward_min_usdt"];
         values[16] = configs["fee"];
         values[17] = configs["claim_min_usdt"];
+        values[18] = configs["team_level1_sub_usdt"];
+        values[19] = configs["team_level1_team_usdt"];
 
         return values;
     }
