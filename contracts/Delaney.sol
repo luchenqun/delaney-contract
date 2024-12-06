@@ -462,9 +462,7 @@ contract Delaney is Pausable, Ownable {
     // 如果mud币价跌了，项目方则必须存入mud进行赔付
     function deposit(uint mud) public whenNotPaused {
         IERC20 mudToken = IERC20(mudAddress);
-        uint256 balance = mudToken.balanceOf(address(this));
-        require(balance >= mud, "Insufficient balance in the contract");
-        bool success = mudToken.transfer(msg.sender, mud);
+        bool success = mudToken.transferFrom(msg.sender, address(this), mud);
         require(success, "Token transfer failed");
 
         stat.depositMud += mud;
