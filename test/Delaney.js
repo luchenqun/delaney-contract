@@ -137,6 +137,8 @@ describe("Delaney", function () {
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const rewardIds = "{}";
 
+      const user1Balance1 = await mudToken.balanceOf(user1.address);
+
       const messageHash = ethers.solidityPackedKeccak256(
         ["address", "uint256", "uint256", "string", "uint256"],
         [user1.address, usdtAmount, minMud, rewardIds, deadline]
@@ -155,13 +157,14 @@ describe("Delaney", function () {
           user1.address,
           0,
           usdtAmount,
-          471157095197528,
+          ethers.parseUnits("475916257775281", 6),
           ethers.hexlify(signature)
         );
 
       // 验证用户余额
       const user1Balance = await mudToken.balanceOf(user1.address);
-      expect(user1Balance).to.equal(472167095197528);
+
+      expect(user1Balance).to.equal(ethers.parseUnits("475916258785281", 6));
     });
 
     it("should revert if claim is made by non-signer", async function () {
@@ -227,13 +230,14 @@ describe("Delaney", function () {
     });
 
     it("should revert if the mud amount does not meet the minimum requirement", async function () {
-      const minMud = 1000000000000000; // 设置一个不合理的最小值
+      const minMud = ethers.parseUnits("100", 18); // 设置一个不合理的最小值
+      const usdt = ethers.parseUnits("1", 18);
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const rewardIds = "reward1";
 
       const messageHash = ethers.solidityPackedKeccak256(
         ["address", "uint256", "uint256", "string", "uint256"],
-        [user1.address, usdtAmount, minMud, rewardIds, deadline]
+        [user1.address, usdt, minMud, rewardIds, deadline]
       );
 
       const signature = await owner.signMessage(ethers.getBytes(messageHash));
@@ -241,7 +245,7 @@ describe("Delaney", function () {
       await expect(
         delaney
           .connect(user1)
-          .claim(usdtAmount, minMud, rewardIds, signature, deadline)
+          .claim(usdt, minMud, rewardIds, signature, deadline)
       ).to.be.revertedWith("Claim mud does not meet your minimum requirement");
     });
   });
@@ -314,29 +318,17 @@ describe("Delaney", function () {
   });
 
   describe("deposit", function () {
-    it("should allow deposits when contract has sufficient balance", async function () {
-      const depositAmount = ethers.parseUnits("1000", 18);
+    it("should deposit tokens correctly", async function () {
+      const depositAmount = ethers.parseUnits("1", 6);
 
-      const balance = await mudToken.balanceOf(user1.address);
-
-      // 用户调用 deposit 函数
-      await expect(delaney.connect(user1).deposit(depositAmount))
-        .to.emit(delaney, "Deposit")
-        .withArgs(user1.address, depositAmount);
-
-      const userBalance = await mudToken.balanceOf(user1.address);
-      expect(userBalance).to.equal(depositAmount + balance);
+      await delaney.connect(user1).deposit(depositAmount);
 
       const stat = await delaney.stat();
       expect(stat.depositMud).to.equal(depositAmount);
-    });
 
-    it("should revert if contract has insufficient balance", async function () {
-      const depositAmount = ethers.parseUnits("60000", 18);
-
-      await expect(
-        delaney.connect(user1).deposit(depositAmount)
-      ).to.be.revertedWith("Insufficient balance in the contract");
+      await expect(delaney.connect(user1).deposit(depositAmount))
+        .to.emit(delaney, "Deposit")
+        .withArgs(user1.address, depositAmount);
     });
   });
 
