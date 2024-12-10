@@ -177,6 +177,8 @@ contract Delaney is Pausable, Ownable {
         uint256 mud
     );
 
+    event AddedBlackList(address indexed evilUser, bool isBlack);
+
     event SetConfig(address indexed owner, string key, uint256 value);
 
     event Deposit(address indexed Depositer, uint256 mud);
@@ -230,6 +232,7 @@ contract Delaney is Pausable, Ownable {
     mapping(uint => uint) public undelegateIds;
     mapping(string => bool) public signatures;
     mapping(string => uint) public configs;
+    mapping(address => bool) public blacklist;
     Stat public stat;
 
     constructor(
@@ -261,6 +264,7 @@ contract Delaney is Pausable, Ownable {
         configs["claim_min_usdt"] = 50 * 1000000;
         configs["team_level1_sub_usdt"] = 5000 * 1000000;
         configs["team_level1_team_usdt"] = 20000 * 1000000;
+        configs["claim_max_usdt"] = 10000 * 1000000;
     }
 
     function mudPrice() public view returns (uint256) {
@@ -282,6 +286,8 @@ contract Delaney is Pausable, Ownable {
         uint minUsdt,
         uint deadline
     ) public whenNotPaused {
+        require(!blacklist[msg.sender], "You have been blacked");
+
         uint usdt = (mudPrice() * mud) / 1000000; // polygon中的usdt也是 6 位小数
 
         require(deadline >= block.timestamp, "Delegate expired");
@@ -330,6 +336,8 @@ contract Delaney is Pausable, Ownable {
         bytes memory signature,
         uint deadline
     ) public whenNotPaused {
+        require(!blacklist[msg.sender], "You have been blacked");
+
         bytes32 ethSignedMessageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n32",
@@ -352,6 +360,10 @@ contract Delaney is Pausable, Ownable {
         require(
             usdt >= configs["claim_min_usdt"],
             "The amount of claim does not meet the minimum amount"
+        );
+        require(
+            usdt <= configs["claim_max_usdt"],
+            "The amount of claim exceed the maximum amount"
         );
         require(
             block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
@@ -396,6 +408,8 @@ contract Delaney is Pausable, Ownable {
 
     // 到期重复质押
     function redelegate(uint id, uint deadline) public whenNotPaused {
+        require(!blacklist[msg.sender], "You have been blacked");
+
         Delegation storage delegation = delegations[id];
 
         require(delegation.delegator == msg.sender, "You aren't the delegator");
@@ -425,6 +439,8 @@ contract Delaney is Pausable, Ownable {
         uint minMud,
         uint deadline
     ) public whenNotPaused {
+        require(!blacklist[msg.sender], "You have been blacked");
+
         Delegation storage delegation = delegations[id];
         require(delegation.delegator == msg.sender, "You aren't the delegator");
 
@@ -498,7 +514,7 @@ contract Delaney is Pausable, Ownable {
     }
 
     function getConfigs() public view returns (uint[] memory) {
-        uint[] memory values = new uint[](20);
+        uint[] memory values = new uint[](21);
         values[0] = configs["period_duration"];
         values[1] = configs["period_num"];
         values[2] = configs["period_reward_ratio"];
@@ -519,6 +535,7 @@ contract Delaney is Pausable, Ownable {
         values[17] = configs["claim_min_usdt"];
         values[18] = configs["team_level1_sub_usdt"];
         values[19] = configs["team_level1_team_usdt"];
+        values[20] = configs["claim_max_usdt"];
 
         return values;
     }
@@ -529,6 +546,11 @@ contract Delaney is Pausable, Ownable {
 
     function unpause() public onlyOwner {
         _unpause();
+    }
+
+    function addBlackList(address user, bool isBlack) public onlyOwner {
+        blacklist[user] = isBlack;
+        emit AddedBlackList(user, isBlack);
     }
 
     function recoverSigner(
