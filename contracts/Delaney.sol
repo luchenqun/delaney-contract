@@ -265,6 +265,7 @@ contract Delaney is Pausable, Ownable {
         configs["team_level1_sub_usdt"] = 5000 * 1000000;
         configs["team_level1_team_usdt"] = 20000 * 1000000;
         configs["claim_max_usdt"] = 10000 * 1000000;
+        configs["claim_gap"] = 24 * 3600;
     }
 
     function mudPrice() public view returns (uint256) {
@@ -366,7 +367,8 @@ contract Delaney is Pausable, Ownable {
             "The amount of claim exceed the maximum amount"
         );
         require(
-            block.timestamp - lastClaimTimestamp[msg.sender] >= 1 days,
+            block.timestamp - lastClaimTimestamp[msg.sender] >=
+                configs["claim_gap"],
             "You can claim only once per day"
         );
         require(deadline >= block.timestamp, "Claim expired");
@@ -398,6 +400,7 @@ contract Delaney is Pausable, Ownable {
         claimants[stat.claimCount] = claimant;
 
         signatures[hexSignature] = true;
+        lastClaimTimestamp[msg.sender] = block.timestamp;
 
         stat.claimCount += 1;
         stat.claimMud += mud;
@@ -514,7 +517,7 @@ contract Delaney is Pausable, Ownable {
     }
 
     function getConfigs() public view returns (uint[] memory) {
-        uint[] memory values = new uint[](21);
+        uint[] memory values = new uint[](22);
         values[0] = configs["period_duration"];
         values[1] = configs["period_num"];
         values[2] = configs["period_reward_ratio"];
@@ -536,6 +539,7 @@ contract Delaney is Pausable, Ownable {
         values[18] = configs["team_level1_sub_usdt"];
         values[19] = configs["team_level1_team_usdt"];
         values[20] = configs["claim_max_usdt"];
+        values[21] = configs["claim_gap"];
 
         return values;
     }
