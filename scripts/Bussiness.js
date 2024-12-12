@@ -2,25 +2,21 @@ const { ethers } = require('hardhat');
 
 async function main() {
   const owner = await ethers.provider.getSigner(0);
+  const usdtAddress = '0x592d157a0765b43b0192Ba28F4b8cd4F50E326cF';
 
-  const MetaUserDAOToken = await ethers.getContractFactory('MetaUserDAOToken');
-  const mudToken = await MetaUserDAOToken.deploy(owner.address);
-  await mudToken.waitForDeployment();
-  console.log(`mudToken contract deployed to ${mudToken.target}`);
-
-  const UniswapV3Pool = await ethers.getContractFactory('UniswapV3Pool');
-  const pool = await UniswapV3Pool.deploy();
-  await pool.waitForDeployment();
-  console.log(`pool contract deployed to ${pool.target}`);
+  const UniswapV2Pair = await ethers.getContractFactory('UniswapV2Pair');
+  const pair = await UniswapV2Pair.deploy();
+  await pair.waitForDeployment();
+  console.log(`UniswapV2Pair contract deployed to ${pair.target}`);
 
   const Delaney = await ethers.getContractFactory('Delaney');
-  const delaney = await Delaney.deploy(owner.address, owner.address, pool.target, mudToken.target);
+  const delaney = await Delaney.deploy(owner.address, owner.address, pair.target, usdtAddress);
   await delaney.waitForDeployment();
   console.log(`delaney contract deployed to ${delaney.target}`);
 
   {
-    const slot0 = await pool.slot0();
-    console.log({ slot0 });
+    const reserves = await pair.getReserves();
+    console.log({ reserves });
   }
 
   {

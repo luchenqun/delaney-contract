@@ -9,141 +9,16 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
-/// @title Contains 512-bit math functions
-/// @notice Facilitates multiplication and division that can have overflow of an intermediate value without any loss of precision
-/// @dev Handles "phantom overflow" i.e., allows multiplication and division where an intermediate value overflows 256 bits
-library FullMath {
-    /// @notice Calculates floor(a×b÷denominator) with full precision. Throws if result overflows a uint256 or denominator == 0
-    /// @param a The multiplicand
-    /// @param b The multiplier
-    /// @param denominator The divisor
-    /// @return result The 256-bit result
-    /// @dev Credit to Remco Bloemen under MIT license https://xn--2-umb.com/21/muldiv
-    function mulDiv(
-        uint256 a,
-        uint256 b,
-        uint256 denominator
-    ) internal pure returns (uint256 result) {
-        // 512-bit multiply [prod1 prod0] = a * b
-        // Compute the product mod 2**256 and mod 2**256 - 1
-        // then use the Chinese Remainder Theorem to reconstruct
-        // the 512 bit result. The result is stored in two 256
-        // variables such that product = prod1 * 2**256 + prod0
-        uint256 prod0; // Least significant 256 bits of the product
-        uint256 prod1; // Most significant 256 bits of the product
-        assembly {
-            let mm := mulmod(a, b, not(0))
-            prod0 := mul(a, b)
-            prod1 := sub(sub(mm, prod0), lt(mm, prod0))
-        }
-
-        // Handle non-overflow cases, 256 by 256 division
-        if (prod1 == 0) {
-            require(denominator > 0);
-            assembly {
-                result := div(prod0, denominator)
-            }
-            return result;
-        }
-
-        // Make sure the result is less than 2**256.
-        // Also prevents denominator == 0
-        require(denominator > prod1);
-
-        ///////////////////////////////////////////////
-        // 512 by 256 division.
-        ///////////////////////////////////////////////
-
-        // Make division exact by subtracting the remainder from [prod1 prod0]
-        // Compute remainder using mulmod
-        uint256 remainder;
-        assembly {
-            remainder := mulmod(a, b, denominator)
-        }
-        // Subtract 256 bit number from 512 bit number
-        assembly {
-            prod1 := sub(prod1, gt(remainder, prod0))
-            prod0 := sub(prod0, remainder)
-        }
-
-        // Factor powers of two out of denominator
-        // Compute largest power of two divisor of denominator.
-        // Always >= 1.
-        uint256 twos = denominator & (~denominator + 1);
-        // Divide denominator by power of two
-        assembly {
-            denominator := div(denominator, twos)
-        }
-
-        // Divide [prod1 prod0] by the factors of two
-        assembly {
-            prod0 := div(prod0, twos)
-        }
-        // Shift in bits from prod1 into prod0. For this we need
-        // to flip `twos` such that it is 2**256 / twos.
-        // If twos is zero, then it becomes one
-        assembly {
-            twos := add(div(sub(0, twos), twos), 1)
-        }
-        prod0 |= prod1 * twos;
-
-        // Invert denominator mod 2**256
-        // Now that denominator is an odd number, it has an inverse
-        // modulo 2**256 such that denominator * inv = 1 mod 2**256.
-        // Compute the inverse by starting with a seed that is correct
-        // correct for four bits. That is, denominator * inv = 1 mod 2**4
-        uint256 inv = (3 * denominator) ^ 2;
-        // Now use Newton-Raphson iteration to improve the precision.
-        // Thanks to Hensel's lifting lemma, this also works in modular
-        // arithmetic, doubling the correct bits in each step.
-        inv *= 2 - denominator * inv; // inverse mod 2**8
-        inv *= 2 - denominator * inv; // inverse mod 2**16
-        inv *= 2 - denominator * inv; // inverse mod 2**32
-        inv *= 2 - denominator * inv; // inverse mod 2**64
-        inv *= 2 - denominator * inv; // inverse mod 2**128
-        inv *= 2 - denominator * inv; // inverse mod 2**256
-
-        // Because the division is now exact we can divide by multiplying
-        // with the modular inverse of denominator. This will give us the
-        // correct result modulo 2**256. Since the precoditions guarantee
-        // that the outcome is less than 2**256, this is the final result.
-        // We don't need to compute the high bits of the result and prod1
-        // is no longer required.
-        result = prod0 * inv;
-        return result;
-    }
-
-    /// @notice Calculates ceil(a×b÷denominator) with full precision. Throws if result overflows a uint256 or denominator == 0
-    /// @param a The multiplicand
-    /// @param b The multiplier
-    /// @param denominator The divisor
-    /// @return result The 256-bit result
-    function mulDivRoundingUp(
-        uint256 a,
-        uint256 b,
-        uint256 denominator
-    ) internal pure returns (uint256 result) {
-        result = mulDiv(a, b, denominator);
-        if (mulmod(a, b, denominator) > 0) {
-            require(result < type(uint256).max);
-            result++;
-        }
-    }
-}
-
-interface IUniswapV3Pool {
-    function slot0()
+// 添加 Uniswap V2 接口
+interface IUniswapV2Pair {
+    function getReserves()
         external
         view
-        returns (
-            uint160 sqrtPriceX96,
-            int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
-        );
+        returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+
+    function token0() external view returns (address);
+
+    function token1() external view returns (address);
 }
 
 contract Delaney is Pausable, Ownable {
@@ -222,9 +97,9 @@ contract Delaney is Pausable, Ownable {
         uint profitMud;
     }
 
-    address public poolAddress;
-    address public mudAddress;
+    address public pairAddress;
     address public signerAddress;
+    address public usdtAddress;
 
     mapping(uint => Delegation) public delegations;
     mapping(address => uint) public lastClaimTimestamp;
@@ -238,12 +113,14 @@ contract Delaney is Pausable, Ownable {
     constructor(
         address initialOwner,
         address initalSignerAddress,
-        address initalPoolAddress,
-        address initalMudAddress
+        address initalPairAddress,
+        address initialUsdtAddress
     ) Ownable(initialOwner) {
         signerAddress = initalSignerAddress;
-        poolAddress = initalPoolAddress;
-        mudAddress = initalMudAddress;
+        pairAddress = initalPairAddress;
+        usdtAddress = initialUsdtAddress;
+
+        configs["fee"] = 0;
         configs["period_duration"] = 15 * 24 * 3600;
         configs["period_num"] = 8;
         configs["period_reward_ratio"] = 5;
@@ -260,36 +137,48 @@ contract Delaney is Pausable, Ownable {
         configs["preson_invest_min_usdt"] = 100 * 1000000;
         configs["preson_reward_min_usdt"] = 100 * 1000000;
         configs["team_reward_min_usdt"] = 1000 * 1000000;
-        configs["fee"] = 0;
         configs["claim_min_usdt"] = 50 * 1000000;
-        configs["team_level1_sub_usdt"] = 5000 * 1000000;
-        configs["team_level1_team_usdt"] = 20000 * 1000000;
         configs["claim_max_usdt"] = 10000 * 1000000;
         configs["claim_gap"] = 24 * 3600;
+        configs["team_level1_sub_usdt"] = 5000 * 1000000;
+        configs["team_level1_team_usdt"] = 20000 * 1000000;
     }
 
     function mudPrice() public view returns (uint256) {
-        IUniswapV3Pool pool = IUniswapV3Pool(poolAddress);
-        (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-        uint8 decimalsMud = 6;
-        uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-        uint256 numerator2 = 10 ** decimalsMud;
-        uint256 price = ((numerator2 * numerator2) /
-            FullMath.mulDiv(numerator1, numerator2, 1 << 192));
+        IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
+        (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
 
-        // 收取了6个点的手续费
-        return (price * 994) / 1000;
+        address token0 = pair.token0();
+
+        // 确定MUD(native token, 18位小数)和USDT(6位小数)的储备量
+        uint256 mudReserve;
+        uint256 usdtReserve;
+
+        if (token0 == usdtAddress) {
+            usdtReserve = reserve0;
+            mudReserve = reserve1;
+        } else {
+            mudReserve = reserve0;
+            usdtReserve = reserve1;
+        }
+
+        // 计算价格 (MUD/USDT)
+        // 我们要计算1 USDT能买多少MUD并保留18位精度
+        uint256 price = (mudReserve * 1e6) / usdtReserve;
+
+        // 扣除0.3%手续费
+        return (price * 997) / 1000;
     }
 
     // 质押mud
     function delegate(
-        uint mud,
         uint minUsdt,
         uint deadline
-    ) public whenNotPaused {
+    ) public payable whenNotPaused {
         require(!blacklist[msg.sender], "You have been blacked");
+        require(msg.value > 0, "Must send MUD");
 
-        uint usdt = (mudPrice() * mud) / 1000000; // polygon中的usdt也是 6 位小数
+        uint usdt = (msg.value * 1e6) / mudPrice(); // 转换为6位小数的USDT价值
 
         require(deadline >= block.timestamp, "Delegate expired");
         require(
@@ -301,10 +190,6 @@ contract Delaney is Pausable, Ownable {
             "Delegate mud corresponding usdt does not meet system minimum requirement"
         );
 
-        IERC20 mudToken = IERC20(mudAddress);
-        bool success = mudToken.transferFrom(msg.sender, address(this), mud);
-        require(success, "Token transfer failed");
-
         uint periodDuration = configs["period_duration"];
         uint periodNum = configs["period_num"];
 
@@ -312,7 +197,7 @@ contract Delaney is Pausable, Ownable {
         uint unlockTime = block.timestamp + periodDuration * periodNum;
         delegation.id = stat.delegateCount;
         delegation.delegator = msg.sender;
-        delegation.mud = mud;
+        delegation.mud = msg.value;
         delegation.usdt = usdt;
         delegation.unlockTime = unlockTime;
         delegation.periodDuration = periodDuration;
@@ -322,14 +207,13 @@ contract Delaney is Pausable, Ownable {
         delegations[stat.delegateCount] = delegation;
 
         stat.delegateCount += 1;
-        stat.delegateMud += mud;
+        stat.delegateMud += msg.value;
         stat.delegateUsdt += usdt;
 
-        emit Delegate(msg.sender, delegation.id, mud, usdt, unlockTime);
+        emit Delegate(msg.sender, delegation.id, msg.value, usdt, unlockTime);
     }
 
     // 领取奖励
-    // rewardIds 是用户去领取了哪些奖励id，比如 "{dynamic_ids:[1,5,6], static_ids:[1,8,9]}"
     function claim(
         uint usdt,
         uint minMud,
@@ -374,18 +258,18 @@ contract Delaney is Pausable, Ownable {
         require(deadline >= block.timestamp, "Claim expired");
         require(!signatures[hexSignature], "You have claimed");
 
-        uint mud = (((usdt / mudPrice()) * (100 - configs["fee"])) / 100) *
-            1000000;
+        uint mud = ((usdt * mudPrice()) * (100 - configs["fee"])) / 100;
         require(
             mud >= minMud,
             "Claim mud does not meet your minimum requirement"
         );
+        require(
+            address(this).balance >= mud,
+            "Insufficient balance in the contract"
+        );
 
-        IERC20 mudToken = IERC20(mudAddress);
-        uint256 balance = mudToken.balanceOf(address(this));
-        require(balance >= mud, "Insufficient balance in the contract");
-        bool success = mudToken.transfer(msg.sender, mud);
-        require(success, "Token transfer failed");
+        (bool success, ) = msg.sender.call{value: mud}("");
+        require(success, "Transfer failed");
 
         Claimant memory claimant;
         claimant.id = stat.claimCount;
@@ -447,7 +331,7 @@ contract Delaney is Pausable, Ownable {
         Delegation storage delegation = delegations[id];
         require(delegation.delegator == msg.sender, "You aren't the delegator");
 
-        uint mud = (delegation.usdt / mudPrice()) * 1000000;
+        uint mud = delegation.usdt * mudPrice();
 
         require(!delegation.withdrew, "You have withdrew");
         require(deadline >= block.timestamp, "Undelegate expired");
@@ -459,12 +343,13 @@ contract Delaney is Pausable, Ownable {
             mud >= minMud,
             "Undelegate mud does not meet your minimum requirement"
         );
+        require(
+            address(this).balance >= mud,
+            "Insufficient balance in the contract"
+        );
 
-        IERC20 mudToken = IERC20(mudAddress);
-        uint256 balance = mudToken.balanceOf(address(this));
-        require(balance >= mud, "Insufficient balance in the contract");
-        bool success = mudToken.transfer(msg.sender, mud);
-        require(success, "Token transfer failed");
+        (bool success, ) = msg.sender.call{value: mud}("");
+        require(success, "Transfer failed");
 
         delegations[id].withdrew = true;
         delegations[id].backMud = mud;
@@ -478,28 +363,23 @@ contract Delaney is Pausable, Ownable {
     }
 
     // 存储
-    // 如果mud币价跌了，项目方则必须存入mud进行赔付
-    function deposit(uint mud) public whenNotPaused {
-        IERC20 mudToken = IERC20(mudAddress);
-        bool success = mudToken.transferFrom(msg.sender, address(this), mud);
-        require(success, "Token transfer failed");
-
-        stat.depositMud += mud;
-
-        emit Deposit(msg.sender, mud);
+    function deposit() public payable whenNotPaused {
+        require(msg.value > 0, "Must send MUD");
+        stat.depositMud += msg.value;
+        emit Deposit(msg.sender, msg.value);
     }
 
-    // 利润
-    // 如果币价涨了，项目方可以把利润即结余的mud取出来
+    // 利润提取
     function profit(uint mud) public onlyOwner whenNotPaused {
-        IERC20 mudToken = IERC20(mudAddress);
-        uint256 balance = mudToken.balanceOf(address(this));
-        require(balance >= mud, "Insufficient balance in the contract");
-        bool success = mudToken.transfer(msg.sender, mud);
-        require(success, "Token transfer failed");
+        require(
+            address(this).balance >= mud,
+            "Insufficient balance in the contract"
+        );
+
+        (bool success, ) = msg.sender.call{value: mud}("");
+        require(success, "Transfer failed");
 
         stat.profitMud += mud;
-
         emit Profit(msg.sender, mud);
     }
 
@@ -512,35 +392,33 @@ contract Delaney is Pausable, Ownable {
         }
 
         configs[key] = value;
-
         emit SetConfig(msg.sender, key, value);
     }
 
     function getConfigs() public view returns (uint[] memory) {
         uint[] memory values = new uint[](22);
-        values[0] = configs["period_duration"];
-        values[1] = configs["period_num"];
-        values[2] = configs["period_reward_ratio"];
-        values[3] = configs["person_reward_level1"];
-        values[4] = configs["person_reward_level2"];
-        values[5] = configs["person_reward_level3"];
-        values[6] = configs["person_reward_level4"];
-        values[7] = configs["person_reward_level5"];
-        values[8] = configs["team_reward_level1"];
-        values[9] = configs["team_reward_level2"];
-        values[10] = configs["team_reward_level3"];
-        values[11] = configs["team_reward_level4"];
-        values[12] = configs["team_reward_level5"];
-        values[13] = configs["preson_invest_min_usdt"];
-        values[14] = configs["preson_reward_min_usdt"];
-        values[15] = configs["team_reward_min_usdt"];
-        values[16] = configs["fee"];
+        values[0] = configs["fee"];
+        values[1] = configs["period_duration"];
+        values[2] = configs["period_num"];
+        values[3] = configs["period_reward_ratio"];
+        values[4] = configs["person_reward_level1"];
+        values[5] = configs["person_reward_level2"];
+        values[6] = configs["person_reward_level3"];
+        values[7] = configs["person_reward_level4"];
+        values[8] = configs["person_reward_level5"];
+        values[9] = configs["team_reward_level1"];
+        values[10] = configs["team_reward_level2"];
+        values[11] = configs["team_reward_level3"];
+        values[12] = configs["team_reward_level4"];
+        values[13] = configs["team_reward_level5"];
+        values[14] = configs["preson_invest_min_usdt"];
+        values[15] = configs["preson_reward_min_usdt"];
+        values[16] = configs["team_reward_min_usdt"];
         values[17] = configs["claim_min_usdt"];
-        values[18] = configs["team_level1_sub_usdt"];
-        values[19] = configs["team_level1_team_usdt"];
-        values[20] = configs["claim_max_usdt"];
-        values[21] = configs["claim_gap"];
-
+        values[18] = configs["claim_max_usdt"];
+        values[19] = configs["claim_gap"];
+        values[20] = configs["team_level1_sub_usdt"];
+        values[21] = configs["team_level1_team_usdt"];
         return values;
     }
 
@@ -562,22 +440,16 @@ contract Delaney is Pausable, Ownable {
         bytes memory signature
     ) public pure returns (address) {
         (bytes32 r, bytes32 s, uint8 v) = splitSignature(signature);
-
         return ecrecover(ethSignedMessageHash, v, r, s);
     }
 
     function splitSignature(
         bytes memory sig
     ) public pure returns (bytes32 r, bytes32 s, uint8 v) {
-        // 检查签名长度，65是标准r,s,v签名的长度
         require(sig.length == 65, "invalid signature length");
-
         assembly {
-            // first 32 bytes, after the length prefix
             r := mload(add(sig, 0x20))
-            // second 32 bytes
             s := mload(add(sig, 0x40))
-            // final byte (first byte of the next 32 bytes)
             v := byte(0, mload(add(sig, 0x60)))
         }
     }
@@ -593,7 +465,6 @@ contract Delaney is Pausable, Ownable {
             hexString[2 * i + 2] = _byteToHex(b / 16);
             hexString[2 * i + 3] = _byteToHex(b % 16);
         }
-
         return string(hexString);
     }
 
@@ -611,4 +482,6 @@ contract Delaney is Pausable, Ownable {
     ) public pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
+
+    receive() external payable {}
 }
