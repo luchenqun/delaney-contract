@@ -311,8 +311,6 @@ contract Delaney is Pausable, Ownable {
         uint periodNum = configs["period_num"];
 
         uint unlockTime = block.timestamp + periodDuration * periodNum;
-        delegation.id = stat.delegateCount;
-        delegation.delegator = msg.sender;
         delegation.unlockTime = unlockTime;
         delegation.periodDuration = periodDuration;
         delegation.periodNum = periodNum;
