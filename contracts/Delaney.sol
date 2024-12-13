@@ -258,7 +258,7 @@ contract Delaney is Pausable, Ownable {
         require(deadline >= block.timestamp, "Claim expired");
         require(!signatures[hexSignature], "You have claimed");
 
-        uint mud = ((usdt * mudPrice()) * (100 - configs["fee"])) / 100;
+        uint mud = ((usdt * mudPrice()) * (100 - configs["fee"])) / 100 / 1e6;
         require(
             mud >= minMud,
             "Claim mud does not meet your minimum requirement"
@@ -329,7 +329,7 @@ contract Delaney is Pausable, Ownable {
         Delegation storage delegation = delegations[id];
         require(delegation.delegator == msg.sender, "You aren't the delegator");
 
-        uint mud = delegation.usdt * mudPrice();
+        uint mud = (delegation.usdt * mudPrice()) / 1e6;
 
         require(!delegation.withdrew, "You have withdrew");
         require(deadline >= block.timestamp, "Undelegate expired");
