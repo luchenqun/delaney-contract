@@ -163,11 +163,21 @@ contract Delaney is Pausable, Ownable {
         }
 
         // 计算价格 (MUD/USDT)
-        // 我们要计算1 USDT能买多少MUD并保留18位精度
-        uint256 price = (mudReserve * 1e6) / usdtReserve;
+        // 我们要计算1 MUD能买多少USDT并保留18位精度
+        uint256 price = (usdtReserve * 1e18) / mudReserve;
 
         // 扣除0.3%手续费
         return (price * 997) / 1000;
+    }
+
+    // mudToUsdt
+    function mudToUsdt(uint mud) public view returns (uint) {
+        return (mud * mudPrice()) / 1e18;
+    }
+
+    // usdtToMud
+    function usdtToMud(uint usdt) public view returns (uint) {
+        return (usdt * 1e18) / mudPrice();
     }
 
     // 质押mud
@@ -178,7 +188,7 @@ contract Delaney is Pausable, Ownable {
         require(!blacklist[msg.sender], "You have been blacked");
         require(msg.value > 0, "Must send MUD");
 
-        uint usdt = (msg.value * 1e6) / mudPrice(); // 转换为6位小数的USDT价值
+        uint usdt = mudToUsdt(msg.value);
 
         require(deadline >= block.timestamp, "Delegate expired");
         require(
@@ -258,7 +268,7 @@ contract Delaney is Pausable, Ownable {
         require(deadline >= block.timestamp, "Claim expired");
         require(!signatures[hexSignature], "You have claimed");
 
-        uint mud = ((usdt * mudPrice()) * (100 - configs["fee"])) / 100 / 1e6;
+        uint mud = usdtToMud((usdt * (100 - configs["fee"])) / 100);
         require(
             mud >= minMud,
             "Claim mud does not meet your minimum requirement"
@@ -329,7 +339,7 @@ contract Delaney is Pausable, Ownable {
         Delegation storage delegation = delegations[id];
         require(delegation.delegator == msg.sender, "You aren't the delegator");
 
-        uint mud = (delegation.usdt * mudPrice()) / 1e6;
+        uint mud = usdtToMud(delegation.usdt);
 
         require(!delegation.withdrew, "You have withdrew");
         require(deadline >= block.timestamp, "Undelegate expired");
