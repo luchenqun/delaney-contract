@@ -15,23 +15,26 @@ async function main() {
     console.log({ price });
   }
 
-  // {
-  //   let tx;
-  //   tx = await delaney.setConfig('period_duration', 30); // 方便测试每个周期设为30秒
-  //   await tx.wait();
+  {
+    let tx;
+    tx = await delaney.setConfig('preson_invest_min_usdt', 1); // 个人最小投资额度
+    await tx.wait();
 
-  //   tx = await delaney.setConfig('period_num', 3); // 方便测试一共3周期
-  //   await tx.wait();
+    tx = await delaney.setConfig('period_duration', 30); // 方便测试每个周期设为30秒
+    await tx.wait();
 
-  //   tx = await delaney.setConfig('preson_reward_min_usdt', 0); // 个人奖励阈值
-  //   await tx.wait();
+    tx = await delaney.setConfig('period_num', 3); // 方便测试一共3周期
+    await tx.wait();
 
-  //   tx = await delaney.setConfig('team_reward_min_usdt', 0); // 团队奖励阈值
-  //   await tx.wait();
+    tx = await delaney.setConfig('preson_reward_min_usdt', 0); // 个人奖励阈值
+    await tx.wait();
 
-  //   tx = await delaney.setConfig('claim_min_usdt', 1); // 奖励领取阈值
-  //   await tx.wait();
-  // }
+    tx = await delaney.setConfig('team_reward_min_usdt', 0); // 团队奖励阈值
+    await tx.wait();
+
+    tx = await delaney.setConfig('claim_min_usdt', 1); // 奖励领取阈值
+    await tx.wait();
+  }
 }
 
 // We recommend this pattern to be able to use async/await everywhere
