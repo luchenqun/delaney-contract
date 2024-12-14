@@ -450,11 +450,11 @@ contract Delaney is Pausable, Ownable {
         _unpause();
     }
 
-    function pauseBusiness() public onlyOwner whenNotPaused {
+    function pauseBusiness() public onlyOwner {
         pausedBusiness = true;
     }
 
-    function unpauseBusiness() public onlyOwner whenNotPaused {
+    function unpauseBusiness() public onlyOwner {
         pausedBusiness = false;
     }
 
