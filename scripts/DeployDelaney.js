@@ -17,10 +17,10 @@ async function main() {
 
   {
     let tx;
-    tx = await delaney.setConfig('preson_invest_min_usdt', 1); // 个人最小投资额度
+    tx = await delaney.setConfig('preson_invest_min_usdt', 1000000); // 个人最小投资额度
     await tx.wait();
 
-    tx = await delaney.setConfig('period_duration', 30); // 方便测试每个周期设为30秒
+    tx = await delaney.setConfig('period_duration', 30); // 方便测试每个周期设为6秒
     await tx.wait();
 
     tx = await delaney.setConfig('period_num', 3); // 方便测试一共3周期
@@ -32,7 +32,13 @@ async function main() {
     tx = await delaney.setConfig('team_reward_min_usdt', 0); // 团队奖励阈值
     await tx.wait();
 
-    tx = await delaney.setConfig('claim_min_usdt', 1); // 奖励领取阈值
+    tx = await delaney.setConfig('team_level1_sub_usdt', 1); // 成为1星的直推条件
+    await tx.wait();
+
+    tx = await delaney.setConfig('team_level1_team_usdt', 1); // 成为1星的团队条件
+    await tx.wait();
+
+    tx = await delaney.setConfig('claim_min_usdt', 1000000); // 奖励领取阈值
     await tx.wait();
   }
 }
