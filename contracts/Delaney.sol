@@ -101,6 +101,7 @@ contract Delaney is Pausable, Ownable {
     address public signerAddress;
     address public usdtAddress;
 
+    bool public pausedBusiness;
     mapping(uint => Delegation) public delegations;
     mapping(address => uint) public lastClaimTimestamp;
     mapping(uint => Claimant) public claimants;
@@ -109,6 +110,11 @@ contract Delaney is Pausable, Ownable {
     mapping(string => uint) public configs;
     mapping(address => bool) public blacklist;
     Stat public stat;
+
+    modifier whenNotPausedBusiness() {
+        require(!pausedBusiness, "Business is paused");
+        _;
+    }
 
     constructor(
         address initialOwner,
@@ -184,7 +190,7 @@ contract Delaney is Pausable, Ownable {
     function delegate(
         uint minUsdt,
         uint deadline
-    ) public payable whenNotPaused {
+    ) public payable whenNotPaused whenNotPausedBusiness {
         require(!blacklist[msg.sender], "You have been blacked");
         require(msg.value > 0, "Must send MUD");
 
@@ -304,7 +310,10 @@ contract Delaney is Pausable, Ownable {
     }
 
     // 到期重复质押
-    function redelegate(uint id, uint deadline) public whenNotPaused {
+    function redelegate(
+        uint id,
+        uint deadline
+    ) public whenNotPaused whenNotPausedBusiness {
         require(!blacklist[msg.sender], "You have been blacked");
 
         Delegation storage delegation = delegations[id];
@@ -391,7 +400,10 @@ contract Delaney is Pausable, Ownable {
         emit Profit(msg.sender, mud);
     }
 
-    function setConfig(string memory key, uint value) public onlyOwner {
+    function setConfig(
+        string memory key,
+        uint value
+    ) public onlyOwner whenNotPaused {
         if (compareString(key, "period_num")) {
             require(value > 0, "Period duration must granter than 0");
         }
@@ -438,7 +450,18 @@ contract Delaney is Pausable, Ownable {
         _unpause();
     }
 
-    function addBlackList(address user, bool isBlack) public onlyOwner {
+    function pauseBusiness() public onlyOwner whenNotPaused {
+        pausedBusiness = true;
+    }
+
+    function unpauseBusiness() public onlyOwner whenNotPaused {
+        pausedBusiness = false;
+    }
+
+    function addBlackList(
+        address user,
+        bool isBlack
+    ) public onlyOwner whenNotPaused {
         blacklist[user] = isBlack;
         emit AddedBlackList(user, isBlack);
     }
