@@ -140,8 +140,8 @@ contract Delaney is Pausable, Ownable {
         configs["team_reward_level3"] = 9;
         configs["team_reward_level4"] = 12;
         configs["team_reward_level5"] = 15;
-        configs["preson_invest_min_usdt"] = 100 * 1000000;
-        configs["preson_reward_min_usdt"] = 100 * 1000000;
+        configs["person_invest_min_usdt"] = 100 * 1000000;
+        configs["person_reward_min_usdt"] = 100 * 1000000;
         configs["team_reward_min_usdt"] = 1000 * 1000000;
         configs["claim_min_usdt"] = 50 * 1000000;
         configs["claim_max_usdt"] = 10000 * 1000000;
@@ -202,7 +202,7 @@ contract Delaney is Pausable, Ownable {
             "Delegate mud corresponding usdt does not meet your minimum requirement"
         );
         require(
-            usdt >= configs["preson_invest_min_usdt"],
+            usdt >= configs["person_invest_min_usdt"],
             "Delegate mud corresponding usdt does not meet system minimum requirement"
         );
 
@@ -365,11 +365,11 @@ contract Delaney is Pausable, Ownable {
             "Insufficient balance in the contract"
         );
 
-        (bool success, ) = msg.sender.call{value: mud}("");
-        require(success, "Transfer failed");
-
         delegations[id].withdrew = true;
         delegations[id].backMud = mud;
+
+        (bool success, ) = msg.sender.call{value: mud}("");
+        require(success, "Transfer failed");
 
         undelegateIds[stat.undelegateCount] = id;
         stat.undelegateCount += 1;
@@ -431,8 +431,8 @@ contract Delaney is Pausable, Ownable {
         values[11] = configs["team_reward_level3"];
         values[12] = configs["team_reward_level4"];
         values[13] = configs["team_reward_level5"];
-        values[14] = configs["preson_invest_min_usdt"];
-        values[15] = configs["preson_reward_min_usdt"];
+        values[14] = configs["person_invest_min_usdt"];
+        values[15] = configs["person_reward_min_usdt"];
         values[16] = configs["team_reward_min_usdt"];
         values[17] = configs["claim_min_usdt"];
         values[18] = configs["claim_max_usdt"];
