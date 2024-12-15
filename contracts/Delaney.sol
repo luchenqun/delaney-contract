@@ -191,6 +191,7 @@ contract Delaney is Pausable, Ownable {
         uint minUsdt,
         uint deadline
     ) public payable whenNotPaused whenNotPausedBusiness {
+        require(tx.origin == msg.sender, "Can't call by external contract");
         require(!blacklist[msg.sender], "You have been blacked");
         require(msg.value > 0, "Must send MUD");
 
@@ -237,6 +238,7 @@ contract Delaney is Pausable, Ownable {
         bytes memory signature,
         uint deadline
     ) public whenNotPaused {
+        require(tx.origin == msg.sender, "Can't call by external contract");
         require(!blacklist[msg.sender], "You have been blacked");
 
         bytes32 ethSignedMessageHash = keccak256(
@@ -314,6 +316,7 @@ contract Delaney is Pausable, Ownable {
         uint id,
         uint deadline
     ) public whenNotPaused whenNotPausedBusiness {
+        require(tx.origin == msg.sender, "Can't call by external contract");
         require(!blacklist[msg.sender], "You have been blacked");
 
         Delegation storage delegation = delegations[id];
@@ -343,6 +346,7 @@ contract Delaney is Pausable, Ownable {
         uint minMud,
         uint deadline
     ) public whenNotPaused {
+        require(tx.origin == msg.sender, "Can't call by external contract");
         require(!blacklist[msg.sender], "You have been blacked");
 
         Delegation storage delegation = delegations[id];
