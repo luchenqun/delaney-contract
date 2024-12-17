@@ -10,5 +10,5 @@ npx hardhat test
 REPORT_GAS=true npx hardhat test
 npx hardhat node
 npx hardhat ignition deploy ./ignition/modules/Lock.js
-npx hardhat verify --network mud 0xb97D47317eB4fC636f0816007EE3289ab4E25D07 0x00000004e1E16f249E2b71c2dc66545215FE9d84 0x00000004e1E16f249E2b71c2dc66545215FE9d84 0x7F202fda32D43F726C77E2B3288e6c6f3e7e341A 0x592d157a0765b43b0192Ba28F4b8cd4F50E326cF  --contract contracts/Delaney.sol:Delaney --show-stack-traces 
+npx hardhat verify --network mud 0xEfcc761e11b5F28DDdD45c3B2CC36fAB139e98FE 0x00000004e1E16f249E2b71c2dc66545215FE9d84 0x00000004e1E16f249E2b71c2dc66545215FE9d84 0x7F202fda32D43F726C77E2B3288e6c6f3e7e341A 0x592d157a0765b43b0192Ba28F4b8cd4F50E326cF  --contract contracts/Delaney.sol:Delaney --show-stack-traces 
 ```
