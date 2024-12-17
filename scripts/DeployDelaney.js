@@ -32,10 +32,10 @@ async function main() {
     tx = await delaney.setConfig('team_reward_min_usdt', 0); // 团队奖励阈值
     await tx.wait();
 
-    tx = await delaney.setConfig('team_level1_sub_usdt', 1); // 成为1星的直推条件
+    tx = await delaney.setConfig('team_level1_sub_usdt', 1000000); // 成为1星的直推条件
     await tx.wait();
 
-    tx = await delaney.setConfig('team_level1_team_usdt', 1); // 成为1星的团队条件
+    tx = await delaney.setConfig('team_level1_team_usdt', 1000000); // 成为1星的团队条件
     await tx.wait();
 
     tx = await delaney.setConfig('claim_min_usdt', 1000000); // 奖励领取阈值
